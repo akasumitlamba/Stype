@@ -5,14 +5,16 @@ lucide.createIcons();
 const themeToggleBtn = document.getElementById('theme-toggle');
 const htmlElement = document.documentElement;
 
-// Check for saved theme preference or use system default
+// Check for saved theme preference
 const savedTheme = localStorage.getItem('theme');
+
+// Apply saved theme if it exists, otherwise Default to Light
 if (savedTheme) {
     htmlElement.setAttribute('data-theme', savedTheme);
 } else {
-    // Check system preference
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    htmlElement.setAttribute('data-theme', prefersDark ? 'dark' : 'light');
+    // Force Light Theme default as requested
+    htmlElement.setAttribute('data-theme', 'light');
+    localStorage.setItem('theme', 'light');
 }
 
 // Toggle Theme on Button Click
