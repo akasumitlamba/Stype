@@ -1,23 +1,25 @@
-// Initialize Lucide Icons
+// Initialize crisp SVG icons
 lucide.createIcons();
 
-// Smooth scrolling for anchor links
-document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-    anchor.addEventListener('click', function (e) {
-        e.preventDefault();
-        document.querySelector(this.getAttribute('href')).scrollIntoView({
-            behavior: 'smooth'
-        });
-    });
-});
+// Theme Configuration
+const themeToggleBtn = document.getElementById('theme-toggle');
+const htmlElement = document.documentElement;
 
-// Subtle parallax for bento items on mouse move
-document.addEventListener('mousemove', (e) => {
-    const cards = document.querySelectorAll('.bento-item');
-    const x = e.clientX / window.innerWidth;
-    const y = e.clientY / window.innerHeight;
+// Check for saved theme preference or use system default
+const savedTheme = localStorage.getItem('theme');
+if (savedTheme) {
+    htmlElement.setAttribute('data-theme', savedTheme);
+} else {
+    // Check system preference
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    htmlElement.setAttribute('data-theme', prefersDark ? 'dark' : 'light');
+}
 
-    cards.forEach(card => {
-        card.style.transform = `translate(${(x - 0.5) * 10}px, ${(y - 0.5) * 10}px)`;
-    });
+// Toggle Theme on Button Click
+themeToggleBtn.addEventListener('click', () => {
+    const currentTheme = htmlElement.getAttribute('data-theme');
+    const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+    
+    htmlElement.setAttribute('data-theme', newTheme);
+    localStorage.setItem('theme', newTheme);
 });
