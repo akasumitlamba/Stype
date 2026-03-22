@@ -1,11 +1,11 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en" data-theme="light">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Stype | Beyond Typing</title>
-    
     <meta name="description" content="Stype is a secure, offline-first speech-to-text utility for Windows. Dictate at the speed of thought with 100% privacy.">
+    
     <link rel="stylesheet" href="style.css">
     <script src="https://unpkg.com/lucide@latest"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -13,6 +13,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
+    <div class="bg-grid"></div>
+
     <nav class="navbar">
         <div class="nav-container">
             <div class="logo">
@@ -20,6 +22,8 @@
                 <span>Stype</span>
             </div>
             <div class="nav-actions">
+                <a href="#quickstart" class="nav-link">Quick Start</a>
+                <a href="#features" class="nav-link">Engine</a>
                 <a href="#legal" class="nav-link">Legal</a>
                 <button id="theme-toggle" class="icon-btn" aria-label="Toggle theme">
                     <i data-lucide="sun" class="sun-icon"></i>
@@ -43,15 +47,54 @@
                     </a>
                     <a href="https://github.com/akasumitlamba/stype" target="_blank" class="btn btn-secondary">
                         <i data-lucide="github"></i>
-                        View Source
+                        Source
                     </a>
                 </div>
-                <p class="system-req">Requires Windows 10/11 • 4GB RAM minimum</p>
+                <p class="system-req">Windows 10/11 • 4GB RAM Minimum</p>
             </div>
         </header>
 
-        <section class="features">
+        <section id="quickstart" class="setup-section">
             <div class="section-container">
+                <div class="section-header">
+                    <h2>Setup & Workflow</h2>
+                    <p>Go from download to dictation in under sixty seconds.</p>
+                </div>
+                
+                <div class="step-grid">
+                    <div class="step-card">
+                        <div class="step-number">01</div>
+                        <h3>Install</h3>
+                        <p>Run the downloaded installer. Stype will automatically launch and nestle quietly into your Windows System Tray.</p>
+                    </div>
+                    <div class="step-card">
+                        <div class="step-number">02</div>
+                        <h3>Configure</h3>
+                        <p>Right-click the Stype tray icon and select 'Settings' to bind your preferred global hotkey (Default: <kbd>Ctrl</kbd> + <kbd>Space</kbd>).</p>
+                    </div>
+                    <div class="step-card">
+                        <div class="step-number">03</div>
+                        <h3>Dictate</h3>
+                        <p>Press your hotkey to start recording. A sleek floating pill will appear. Speak, press the hotkey again, and watch your text paste instantly.</p>
+                    </div>
+                </div>
+
+                <div class="ui-mockup">
+                    <div class="mockup-pill">
+                        <div class="mockup-dot"></div>
+                        <span>Recording...</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="features" class="features">
+            <div class="section-container">
+                <div class="section-header">
+                    <h2>Under the Hood</h2>
+                    <p>Engineered for privacy, speed, and absolute focus.</p>
+                </div>
+                
                 <div class="grid">
                     <div class="card">
                         <div class="card-icon"><i data-lucide="shield-check"></i></div>
@@ -61,7 +104,7 @@
                     <div class="card">
                         <div class="card-icon"><i data-lucide="zap"></i></div>
                         <h3>Zero Latency</h3>
-                        <p>Powered by a deeply optimized C++ backend, Stype delivers near-instant transcription without the need for a dedicated GPU.</p>
+                        <p>Powered by a deeply optimized C++ backend (`faster-whisper`), Stype delivers near-instant transcription without the need for a dedicated GPU.</p>
                     </div>
                     <div class="card">
                         <div class="card-icon"><i data-lucide="keyboard"></i></div>
@@ -74,7 +117,9 @@
 
         <section id="legal" class="legal-section">
             <div class="section-container">
-                <h2>Legal & Privacy</h2>
+                <div class="section-header">
+                    <h2>Legal & Privacy</h2>
+                </div>
                 <div class="accordion-group">
                     
                     <details class="accordion">
@@ -84,7 +129,7 @@
                         </summary>
                         <div class="accordion-content">
                             <div class="legal-text">
-                                <h4>Last Updated: March 22, 2026</h4>
+                                <h4>Last Updated: March 2026</h4>
                                 <p>At Stype, we believe your voice and your data belong exclusively to you. This policy outlines our strict, local-first approach to data handling.</p>
                                 
                                 <h5>1. Local Processing</h5>
@@ -119,7 +164,7 @@
                                 <p>Any redistributions or modified versions must retain the copyright notice, link to the original repository, and be distributed under these exact same terms.</p>
                                 
                                 <h5>4. Disclaimer</h5>
-                                <p>THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED. IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE.</p>
+                                <p>THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND. IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY ARISING FROM THE SOFTWARE.</p>
                             </div>
                         </div>
                     </details>
