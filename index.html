@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stype | Beyond Typing</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="logo">Stype</div>
+        <div class="nav-links">
+            <a href="#features">Features</a>
+            <a href="#how-it-works">Technology</a>
+            <a href="https://github.com/akasumitlamba/stype" class="btn-secondary">GitHub</a>
+        </div>
+    </nav>
+
+    <header class="hero">
+        <div class="hero-content">
+            <span class="badge">Version 1.0.0 Now Live</span>
+            <h1>The speed of thought,<br><span class="gradient-text">typed at the speed of sound.</span></h1>
+            <p>A premium, offline-first speech-to-text utility for Windows. Dictate anywhere, process locally, and stay in your flow.</p>
+            <div class="hero-btns">
+                <a href="https://github.com/akasumitlamba/stype/releases" class="btn-primary">Download Installer</a>
+                <a href="#setup" class="btn-outline">View Setup Guide</a>
+            </div>
+        </div>
+    </header>
+
+    <section id="features" class="section">
+        <div class="container">
+            <h2 class="section-title">Engineered for Focus</h2>
+            <div class="bento-grid">
+                <div class="bento-item tall">
+                    <i data-lucide="shield-check"></i>
+                    <h3>Privacy First</h3>
+                    <p>Zero data leaves your machine. Whisper AI processes your voice locally, ensuring total confidentiality.</p>
+                </div>
+                <div class="bento-item">
+                    <i data-lucide="zap"></i>
+                    <h3>Low Latency</h3>
+                    <p>Optimized C++ backend provides near-instant transcription even on 4GB RAM systems.</p>
+                </div>
+                <div class="bento-item">
+                    <i data-lucide="keyboard"></i>
+                    <h3>Global Hook</h3>
+                    <p>Custom hotkey engine with OS-level suppression. Bind any combo without system conflicts.</p>
+                </div>
+                <div class="bento-item wide">
+                    <i data-lucide="layers"></i>
+                    <h3>Dynamic Pill UI</h3>
+                    <p>An elegant, non-intrusive overlay that floats at the bottom of your screen to show real-time processing status.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="how-it-works" class="section dark-bg">
+        <div class="container split">
+            <div class="text-side">
+                <h2 class="section-title">How it Works</h2>
+                <div class="step">
+                    <div class="number">01</div>
+                    <p><strong>Capture:</strong> Press your hotkey. Stype engages a low-latency audio stream via your system microphone.</p>
+                </div>
+                <div class="step">
+                    <div class="number">02</div>
+                    <p><strong>Inference:</strong> OpenAI's Whisper model (int8 quantized) performs deep-learning transcription on your CPU.</p>
+                </div>
+                <div class="step">
+                    <div class="number">03</div>
+                    <p><strong>Automation:</strong> Stype formats the text and simulates a system-level paste directly into your active cursor.</p>
+                </div>
+            </div>
+            <div class="visual-side">
+                <div class="glass-card">
+                    <div class="status-indicator">
+                        <div class="dot active"></div>
+                        <span>Processing AI...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="setup" class="section">
+        <div class="container">
+            <h2 class="section-title">Get Started</h2>
+            <div class="setup-steps">
+                <div class="setup-card">
+                    <i data-lucide="download-cloud"></i>
+                    <h4>Install</h4>
+                    <p>Run the Setup.exe and launch the application.</p>
+                </div>
+                <div class="setup-card">
+                    <i data-lucide="settings"></i>
+                    <h4>Configure</h4>
+                    <p>Right-click the tray icon to set your preferred global hotkey.</p>
+                </div>
+                <div class="setup-card">
+                    <i data-lucide="mic"></i>
+                    <h4>Speak</h4>
+                    <p>Press the hotkey, talk, and watch it type for you.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <footer>
+        <p>Developed with precision by <a href="https://github.com/akasumitlamba/">akasumitlamba</a></p>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>
