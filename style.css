@@ -10,7 +10,6 @@
     --hover-bg: #F3F4F6;
     --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
 }
-
 [data-theme="dark"] {
     /* Dark Theme Palette */
     --bg-color: #030712;
