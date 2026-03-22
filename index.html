@@ -1,185 +1,569 @@
-<!DOCTYPE html>
-<html lang="en" data-theme="light">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stype | Beyond Typing</title>
-    <meta name="description" content="Stype is a secure, offline-first speech-to-text utility for Windows. Dictate at the speed of thought with 100% privacy.">
-    
-    <link rel="stylesheet" href="style.css">
-    <script src="https://unpkg.com/lucide@latest"></script>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-</head>
-<body>
-    <div class="bg-grid"></div>
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Stype - Voice at the Speed of Thought</title>
+    <meta
+      name="description"
+      content="Stype is a secure, offline-first speech-to-text utility for Windows. Powered by Whisper AI. 100% private, no cloud."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div id="cur"></div>
+    <div id="cur-ring"></div>
+    <div class="grain" aria-hidden="true"></div>
 
-    <nav class="navbar">
-        <div class="nav-container">
-            <div class="logo">
-                <i data-lucide="mic"></i>
-                <span>Stype</span>
-            </div>
-            <div class="nav-actions">
-                <a href="#quickstart" class="nav-link">Quick Start</a>
-                <a href="#features" class="nav-link">Engine</a>
-                <a href="#legal" class="nav-link">Legal</a>
-                <button id="theme-toggle" class="icon-btn" aria-label="Toggle theme">
-                    <i data-lucide="sun" class="sun-icon"></i>
-                    <i data-lucide="moon" class="moon-icon"></i>
-                </button>
-            </div>
+    <div class="bg-mesh" aria-hidden="true">
+      <div class="mesh-blob mesh-blob--1"></div>
+      <div class="mesh-blob mesh-blob--2"></div>
+      <div class="mesh-blob mesh-blob--3"></div>
+      <div class="mesh-blob mesh-blob--4"></div>
+    </div>
+
+    <!-- NAVBAR -->
+    <nav class="nav" id="nav">
+      <a href="#" class="logo">
+        <div class="logo-mark">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="white"
+            stroke-width="2.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z" />
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+            <line x1="12" y1="19" x2="12" y2="22" />
+            <line x1="8" y1="22" x2="16" y2="22" />
+          </svg>
         </div>
+        <span class="logo-name">Stype</span>
+      </a>
+
+      <ul class="nav-links" role="list">
+        <li><a href="#quickstart">Quickstart</a></li>
+        <li><a href="#features">Features</a></li>
+        <li><a href="#legal">Legal</a></li>
+      </ul>
+
+      <div class="nav-right">
+        <a
+          href="https://github.com/akasumitlamba/Stype"
+          target="_blank"
+          rel="noopener"
+          class="nav-gh"
+        >
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path
+              d="M12 0C5.37 0 0 5.37 0 12c0 5.3 3.44 9.8 8.21 11.39.6.11.82-.26.82-.58v-2.03c-3.34.73-4.04-1.61-4.04-1.61-.55-1.38-1.33-1.75-1.33-1.75-1.09-.74.08-.73.08-.73 1.2.09 1.84 1.24 1.84 1.24 1.07 1.83 2.81 1.3 3.5.99.11-.78.42-1.3.76-1.6-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.13-.3-.54-1.52.12-3.18 0 0 1.01-.32 3.3 1.23A11.5 11.5 0 0 1 12 5.8c.93 0 1.87.13 2.75.38 2.29-1.55 3.3-1.23 3.3-1.23.66 1.66.25 2.88.12 3.18.77.84 1.24 1.91 1.24 3.22 0 4.61-2.81 5.62-5.48 5.92.43.37.82 1.1.82 2.22v3.29c0 .32.21.7.83.58C20.57 21.79 24 17.3 24 12c0-6.63-5.37-12-12-12z"
+            />
+          </svg>
+          GitHub
+        </a>
+
+        <button id="theme-toggle" class="theme-btn" aria-label="Toggle theme">
+          <svg
+            class="icon-sun"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <circle cx="12" cy="12" r="5" />
+            <line x1="12" y1="1" x2="12" y2="3" />
+            <line x1="12" y1="21" x2="12" y2="23" />
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+            <line x1="1" y1="12" x2="3" y2="12" />
+            <line x1="21" y1="12" x2="23" y2="12" />
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+          </svg>
+          <svg
+            class="icon-moon"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+          </svg>
+        </button>
+      </div>
     </nav>
 
-    <main>
-        <header class="hero">
-            <div class="hero-inner">
-                <div class="version-tag">v1.0.0 Release</div>
-                <h1>The speed of thought,<br>typed at the speed of sound.</h1>
-                <p class="subtitle">A premium, offline-first speech-to-text utility for Windows. Dictate seamlessly into any application, process locally, and stay entirely in your flow.</p>
-                
-                <div class="hero-actions">
-                    <a href="https://github.com/akasumitlamba/Stype/releases/download/v1.0.0/Stype_Setup_v1.0.0.exe" class="btn btn-primary">
-                        <i data-lucide="download"></i>
-                        Download for Windows
-                    </a>
-                    <a href="https://github.com/akasumitlamba/stype" target="_blank" class="btn btn-secondary">
-                        <i data-lucide="github"></i>
-                        Source
-                    </a>
-                </div>
-                <p class="system-req">Windows 10/11 • 4GB RAM Minimum</p>
-            </div>
-        </header>
-
-        <section id="quickstart" class="setup-section">
-            <div class="section-container">
-                <div class="section-header">
-                    <h2>Setup & Workflow</h2>
-                    <p>Go from download to dictation in under sixty seconds.</p>
-                </div>
-                
-                <div class="step-grid">
-                    <div class="step-card">
-                        <div class="step-number">01</div>
-                        <h3>Install</h3>
-                        <p>Run the downloaded installer. Stype will automatically launch and nestle quietly into your Windows System Tray.</p>
-                    </div>
-                    <div class="step-card">
-                        <div class="step-number">02</div>
-                        <h3>Configure</h3>
-                        <p>Right-click the Stype tray icon and select 'Settings' to bind your preferred global hotkey (Default: <kbd>Ctrl</kbd> + <kbd>Space</kbd>).</p>
-                    </div>
-                    <div class="step-card">
-                        <div class="step-number">03</div>
-                        <h3>Dictate</h3>
-                        <p>Press your hotkey to start recording. A sleek floating pill will appear. Speak, press the hotkey again, and watch your text paste instantly.</p>
-                    </div>
-                </div>
-
-                <div class="ui-mockup">
-                    <div class="mockup-pill">
-                        <div class="mockup-dot"></div>
-                        <span>Recording...</span>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <section id="features" class="features">
-            <div class="section-container">
-                <div class="section-header">
-                    <h2>Under the Hood</h2>
-                    <p>Engineered for privacy, speed, and absolute focus.</p>
-                </div>
-                
-                <div class="grid">
-                    <div class="card">
-                        <div class="card-icon"><i data-lucide="shield-check"></i></div>
-                        <h3>Absolute Privacy</h3>
-                        <p>Zero data leaves your machine. The Whisper AI engine runs entirely on your local hardware, ensuring your voice is never uploaded to the cloud.</p>
-                    </div>
-                    <div class="card">
-                        <div class="card-icon"><i data-lucide="zap"></i></div>
-                        <h3>Zero Latency</h3>
-                        <p>Powered by a deeply optimized C++ backend (`faster-whisper`), Stype delivers near-instant transcription without the need for a dedicated GPU.</p>
-                    </div>
-                    <div class="card">
-                        <div class="card-icon"><i data-lucide="keyboard"></i></div>
-                        <h3>Global Injection</h3>
-                        <p>Bind any custom hotkey. Stype suppresses OS-level conflicts and injects your transcribed text directly into your active cursor position.</p>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <section id="legal" class="legal-section">
-            <div class="section-container">
-                <div class="section-header">
-                    <h2>Legal & Privacy</h2>
-                </div>
-                <div class="accordion-group">
-                    
-                    <details class="accordion">
-                        <summary>
-                            <span class="summary-title">Privacy Policy</span>
-                            <i data-lucide="chevron-down"></i>
-                        </summary>
-                        <div class="accordion-content">
-                            <div class="legal-text">
-                                <h4>Last Updated: March 2026</h4>
-                                <p>At Stype, we believe your voice and your data belong exclusively to you. This policy outlines our strict, local-first approach to data handling.</p>
-                                
-                                <h5>1. Local Processing</h5>
-                                <p>Stype is a fully offline application. All audio captured via your microphone is processed locally on your computer using the Whisper AI model. No audio data is uploaded to the cloud, no text data is sent to external servers, and no internet connection is required for transcription.</p>
-                                
-                                <h5>2. Data Collection</h5>
-                                <p>Stype does not collect, store, or transmit any personally identifiable information (PII). We do not use cookies, tracking pixels, or telemetry.</p>
-                                
-                                <h5>3. System Permissions</h5>
-                                <p>To function, Stype requires temporary access to your microphone (for audio capture), keyboard hooks (to detect your global shortcut), and clipboard (to paste the resulting text).</p>
-                            </div>
-                        </div>
-                    </details>
-
-                    <details class="accordion">
-                        <summary>
-                            <span class="summary-title">License Agreement (Non-Commercial)</span>
-                            <i data-lucide="chevron-down"></i>
-                        </summary>
-                        <div class="accordion-content">
-                            <div class="legal-text">
-                                <h4>Stype License Agreement v1.0.0</h4>
-                                <p>Copyright (c) 2026 akasumitlamba</p>
-                                
-                                <h5>1. Grant of License</h5>
-                                <p>Permission is hereby granted, free of charge, to any person obtaining a copy of this software, to use, copy, and modify the Software for personal, educational, or research purposes.</p>
-                                
-                                <h5>2. Non-Commercial Restriction</h5>
-                                <p>The Software may NOT be used for commercial purposes. This includes selling the Software, using it to provide a paid service, or bundling it with commercial products.</p>
-                                
-                                <h5>3. Attribution & Share Alike</h5>
-                                <p>Any redistributions or modified versions must retain the copyright notice, link to the original repository, and be distributed under these exact same terms.</p>
-                                
-                                <h5>4. Disclaimer</h5>
-                                <p>THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND. IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY ARISING FROM THE SOFTWARE.</p>
-                            </div>
-                        </div>
-                    </details>
-
-                </div>
-            </div>
-        </section>
-    </main>
-
-    <footer>
-        <div class="footer-container">
-            <p>Designed and engineered by <a href="https://github.com/akasumitlamba/" target="_blank">akasumitlamba</a>.</p>
+    <!-- HERO -->
+    <section class="hero">
+      <div class="hero-left">
+        <div class="hero-badge">
+          <span class="badge-dot"></span>
+          v1.0.0 - Available Now
         </div>
+
+        <h1 class="hero-title">
+          Voice at the<br /><em>speed</em><br />of thought.
+        </h1>
+
+        <p class="hero-sub">
+          Stype converts speech to text instantly using offline Whisper AI. No
+          cloud, no subscriptions - your voice stays on your machine.
+        </p>
+
+        <div class="hero-actions">
+          <a
+            href="https://github.com/akasumitlamba/Stype/releases/download/v1.0.0/Stype_Setup_v1.0.0.exe"
+            class="btn btn-dl"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="7 10 12 15 17 10" />
+              <line x1="12" y1="15" x2="12" y2="3" />
+            </svg>
+            Download for Windows
+          </a>
+          <a
+            href="https://github.com/akasumitlamba/stype"
+            target="_blank"
+            rel="noopener"
+            class="btn btn-src"
+          >
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path
+                d="M12 0C5.37 0 0 5.37 0 12c0 5.3 3.44 9.8 8.21 11.39.6.11.82-.26.82-.58v-2.03c-3.34.73-4.04-1.61-4.04-1.61-.55-1.38-1.33-1.75-1.33-1.75-1.09-.74.08-.73.08-.73 1.2.09 1.84 1.24 1.84 1.24 1.07 1.83 2.81 1.3 3.5.99.11-.78.42-1.3.76-1.6-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.13-.3-.54-1.52.12-3.18 0 0 1.01-.32 3.3 1.23A11.5 11.5 0 0 1 12 5.8c.93 0 1.87.13 2.75.38 2.29-1.55 3.3-1.23 3.3-1.23.66 1.66.25 2.88.12 3.18.77.84 1.24 1.91 1.24 3.22 0 4.61-2.81 5.62-5.48 5.92.43.37.82 1.1.82 2.22v3.29c0 .32.21.7.83.58C20.57 21.79 24 17.3 24 12c0-6.63-5.37-12-12-12z"
+              />
+            </svg>
+            View Source
+          </a>
+        </div>
+
+        <p class="hero-note">
+          Windows 10 / 11 &nbsp;&middot;&nbsp; 4 GB RAM min &nbsp;&middot;&nbsp;
+          No internet required
+        </p>
+      </div>
+
+      <div class="hero-right">
+        <div class="hero-card">
+          <div class="wave-wrap" id="waveWrap" aria-hidden="true"></div>
+          <div class="pill-stage">
+            <div class="pill-eyebrow">Live overlay preview</div>
+            <div class="pill" id="pill">
+              <div class="pill-dot rec" id="pDot"></div>
+              <span class="pill-label" id="pLabel">Recording...</span>
+            </div>
+          </div>
+          <div class="card-stat-row">
+            <div class="card-stat">
+              <span class="stat-val">100%</span>
+              <span class="stat-lbl">Offline</span>
+            </div>
+            <div class="card-stat-div"></div>
+            <div class="card-stat">
+              <span class="stat-val">&lt;1s</span>
+              <span class="stat-lbl">Latency</span>
+            </div>
+            <div class="card-stat-div"></div>
+            <div class="card-stat">
+              <span class="stat-val">0</span>
+              <span class="stat-lbl">Cloud calls</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="divider"></div>
+
+    <!-- QUICKSTART -->
+    <section id="quickstart" class="section">
+      <div class="container">
+        <div class="section-head r">
+          <div class="eyebrow">Quickstart</div>
+          <h2 class="s-title">Up and running<br />in sixty seconds.</h2>
+          <p class="s-desc">
+            Everything you need to go from download to your first dictated
+            sentence.
+          </p>
+        </div>
+
+        <div class="steps-grid">
+          <div class="step r d1">
+            <span class="step-n">01</span>
+            <div class="step-title">Download &amp; Install</div>
+            <p class="step-desc">
+              Run the setup executable. Stype launches and parks itself in your
+              Windows system tray. If SmartScreen prompts, click More Info
+              &rarr; Run Anyway - expected for independent open-source apps.
+            </p>
+          </div>
+          <div class="step r d2">
+            <span class="step-n">02</span>
+            <div class="step-title">Bind Your Hotkey</div>
+            <p class="step-desc">
+              Right-click the tray icon, open Settings, and assign any global
+              shortcut. Default is
+              <kbd>Ctrl</kbd>&thinsp;+&thinsp;<kbd>Space</kbd>. Works across
+              every app - browser, IDE, email, anywhere.
+            </p>
+          </div>
+          <div class="step r d3">
+            <span class="step-n">03</span>
+            <div class="step-title">Speak &amp; Paste</div>
+            <p class="step-desc">
+              Press your hotkey once to begin, speak naturally, press again to
+              finish. Stype shows a live status pill, then pastes the
+              transcribed text directly at your cursor position.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="divider"></div>
+
+    <!-- FEATURES -->
+    <section id="features" class="section">
+      <div class="container">
+        <div class="section-head r">
+          <div class="eyebrow">Under the Hood</div>
+          <h2 class="s-title">
+            Engineered for silence,<br />speed, and precision.
+          </h2>
+          <p class="s-desc">
+            Every decision in Stype is built to stay out of your way while you
+            think.
+          </p>
+        </div>
+
+        <div class="feat-grid">
+          <div class="feat-card r d1">
+            <div class="feat-icon">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+              </svg>
+            </div>
+            <div class="feat-title">Absolute Privacy</div>
+            <p class="feat-desc">
+              Zero audio leaves your machine. Whisper AI runs entirely on local
+              hardware. No servers, no logs, no cloud calls.
+            </p>
+          </div>
+          <div class="feat-card r d2">
+            <div class="feat-icon">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+              </svg>
+            </div>
+            <div class="feat-title">Near-Zero Latency</div>
+            <p class="feat-desc">
+              faster-whisper with a CTranslate2 C++ backend. High-accuracy
+              transcription on CPU - no GPU required.
+            </p>
+          </div>
+          <div class="feat-card r d3">
+            <div class="feat-icon">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <rect x="2" y="3" width="20" height="14" rx="2" />
+                <line x1="8" y1="21" x2="16" y2="21" />
+                <line x1="12" y1="17" x2="12" y2="21" />
+              </svg>
+            </div>
+            <div class="feat-title">Universal Injection</div>
+            <p class="feat-desc">
+              Works in every app - browsers, IDEs, Office. Suppresses OS hotkey
+              conflicts and injects text at your cursor.
+            </p>
+          </div>
+          <div class="feat-card r d1">
+            <div class="feat-icon">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M4 6h16M4 12h16M4 18h7" />
+              </svg>
+            </div>
+            <div class="feat-title">Smart Formatting</div>
+            <p class="feat-desc">
+              Automatic capitalization and punctuation. Text arrives clean and
+              paste-ready - no cleanup needed.
+            </p>
+          </div>
+          <div class="feat-card r d2">
+            <div class="feat-icon">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <circle cx="12" cy="12" r="2" />
+                <path
+                  d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"
+                />
+              </svg>
+            </div>
+            <div class="feat-title">Minimal Footprint</div>
+            <p class="feat-desc">
+              Low CPU at idle, modest memory, zero telemetry. Stype is present
+              when you need it, invisible otherwise.
+            </p>
+          </div>
+          <div class="feat-card r d3">
+            <div class="feat-icon">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <circle cx="12" cy="12" r="10" />
+                <polyline points="12 6 12 12 16 14" />
+              </svg>
+            </div>
+            <div class="feat-title">Real-Time Pill UI</div>
+            <p class="feat-desc">
+              A floating overlay cycles through Recording, Processing, and
+              Pasted states. It vanishes when done - no clutter.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TECH STRIP -->
+    <div class="tech-strip r">
+      <div class="tech-inner">
+        <span class="tech-label">Built With</span>
+        <div class="tech-sep"></div>
+        <div class="tech-tags">
+          <span class="tech-tag">Python 3.13</span>
+          <span class="tech-tag">PySide6</span>
+          <span class="tech-tag">faster-whisper</span>
+          <span class="tech-tag">CTranslate2</span>
+          <span class="tech-tag">sounddevice</span>
+          <span class="tech-tag">numpy</span>
+          <span class="tech-tag">keyboard</span>
+          <span class="tech-tag">pyperclip</span>
+          <span class="tech-tag">Inno Setup</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- LEGAL -->
+    <section id="legal" class="section">
+      <div class="container">
+        <div class="section-head r">
+          <div class="eyebrow">Legal</div>
+          <h2 class="s-title">Transparency<br />by default.</h2>
+          <p class="s-desc">
+            All terms are human-readable and written to protect you, not the
+            app.
+          </p>
+        </div>
+
+        <div class="accord-list r">
+          <details class="acc">
+            <summary>
+              <span class="acc-title">Privacy Policy</span>
+              <svg
+                class="acc-arr"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </summary>
+            <div class="acc-body">
+              <h4>Last Updated - March 2026</h4>
+              <p>
+                At Stype, your voice and your data belong exclusively to you.
+                This policy outlines our strict, local-first approach.
+              </p>
+              <h5>1. Local Processing</h5>
+              <p>
+                Stype is a fully offline application. All audio captured via
+                your microphone is processed locally using the Whisper AI model.
+                No audio is uploaded, no text is transmitted externally, and no
+                internet connection is required for transcription.
+              </p>
+              <h5>2. Data Collection</h5>
+              <p>
+                Stype does not collect, store, or transmit any personally
+                identifiable information. There are no cookies, tracking pixels,
+                crash reporters, or telemetry of any kind.
+              </p>
+              <h5>3. System Permissions</h5>
+              <p>
+                Stype requires temporary microphone access for audio capture,
+                keyboard hooks to detect your global shortcut, and clipboard
+                access to paste the resulting text. These permissions are used
+                solely for their stated purpose.
+              </p>
+            </div>
+          </details>
+
+          <details class="acc">
+            <summary>
+              <span class="acc-title">License Agreement (Non-Commercial)</span>
+              <svg
+                class="acc-arr"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </summary>
+            <div class="acc-body">
+              <h4>Stype License Agreement - v1.0.0</h4>
+              <p>Copyright &copy; 2026 akasumitlamba. All rights reserved.</p>
+              <h5>1. Grant of License</h5>
+              <p>
+                Permission is granted, free of charge, to use, copy, and modify
+                this software for personal, educational, or research purposes
+                only.
+              </p>
+              <h5>2. Non-Commercial Restriction</h5>
+              <p>
+                The Software may not be used for commercial purposes - including
+                selling it, providing a paid service with it, or bundling with
+                commercial products - without explicit written permission from
+                the author.
+              </p>
+              <h5>3. Attribution &amp; Share-Alike</h5>
+              <p>
+                Redistributions or derivative versions must retain the original
+                copyright notice, a link to this repository, and be distributed
+                under these exact same terms.
+              </p>
+              <h5>4. Disclaimer</h5>
+              <p>
+                THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
+                IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES,
+                OR OTHER LIABILITY ARISING FROM THE USE OF THIS SOFTWARE.
+              </p>
+            </div>
+          </details>
+        </div>
+      </div>
+    </section>
+
+    <!-- FOOTER -->
+    <footer class="footer">
+      <div class="footer-inner">
+        <div class="f-logo">
+          <div class="f-mark">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="white"
+              stroke-width="2.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z" />
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+            </svg>
+          </div>
+          <span class="f-name">Stype</span>
+          <span class="f-ver">v1.0.0</span>
+        </div>
+        <div class="f-links">
+          <span>Built by</span>
+          <a
+            href="https://github.com/akasumitlamba"
+            target="_blank"
+            rel="noopener"
+            >akasumitlamba</a
+          >
+          <span class="f-dot">&middot;</span>
+          <a
+            href="https://github.com/akasumitlamba/Stype"
+            target="_blank"
+            rel="noopener"
+            >GitHub</a
+          >
+          <span class="f-dot">&middot;</span>
+          <a
+            href="https://github.com/akasumitlamba/Stype/releases"
+            target="_blank"
+            rel="noopener"
+            >Releases</a
+          >
+        </div>
+      </div>
     </footer>
 
     <script src="script.js"></script>
-</body>
+  </body>
 </html>
