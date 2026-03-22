@@ -1,118 +1,138 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Stype | Beyond Typing</title>
+    
+    <meta name="description" content="Stype is a secure, offline-first speech-to-text utility for Windows. Dictate at the speed of thought with 100% privacy.">
     <link rel="stylesheet" href="style.css">
     <script src="https://unpkg.com/lucide@latest"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
     <nav class="navbar">
-        <div class="logo">Stype</div>
-        <div class="nav-links">
-            <a href="#features">Features</a>
-            <a href="#how-it-works">Technology</a>
-            <a href="https://github.com/akasumitlamba/stype" class="btn-secondary">GitHub</a>
+        <div class="nav-container">
+            <div class="logo">
+                <i data-lucide="mic"></i>
+                <span>Stype</span>
+            </div>
+            <div class="nav-actions">
+                <a href="#legal" class="nav-link">Legal</a>
+                <button id="theme-toggle" class="icon-btn" aria-label="Toggle theme">
+                    <i data-lucide="sun" class="sun-icon"></i>
+                    <i data-lucide="moon" class="moon-icon"></i>
+                </button>
+            </div>
         </div>
     </nav>
 
-    <header class="hero">
-        <div class="hero-content">
-            <span class="badge">Version 1.0.0 Now Live</span>
-            <h1>The speed of thought,<br><span class="gradient-text">typed at the speed of sound.</span></h1>
-            <p>A premium, offline-first speech-to-text utility for Windows. Dictate anywhere, process locally, and stay in your flow.</p>
-            <div class="hero-btns">
-                <a href="https://github.com/akasumitlamba/stype/releases" class="btn-primary">Download Installer</a>
-                <a href="#setup" class="btn-outline">View Setup Guide</a>
+    <main>
+        <header class="hero">
+            <div class="hero-inner">
+                <div class="version-tag">v1.0.0 Release</div>
+                <h1>The speed of thought,<br>typed at the speed of sound.</h1>
+                <p class="subtitle">A premium, offline-first speech-to-text utility for Windows. Dictate seamlessly into any application, process locally, and stay entirely in your flow.</p>
+                
+                <div class="hero-actions">
+                    <a href="https://github.com/akasumitlamba/Stype/releases/download/v1.0.0/Stype_Setup_v1.0.0.exe" class="btn btn-primary">
+                        <i data-lucide="download"></i>
+                        Download for Windows
+                    </a>
+                    <a href="https://github.com/akasumitlamba/stype" target="_blank" class="btn btn-secondary">
+                        <i data-lucide="github"></i>
+                        View Source
+                    </a>
+                </div>
+                <p class="system-req">Requires Windows 10/11 • 4GB RAM minimum</p>
             </div>
-        </div>
-    </header>
+        </header>
 
-    <section id="features" class="section">
-        <div class="container">
-            <h2 class="section-title">Engineered for Focus</h2>
-            <div class="bento-grid">
-                <div class="bento-item tall">
-                    <i data-lucide="shield-check"></i>
-                    <h3>Privacy First</h3>
-                    <p>Zero data leaves your machine. Whisper AI processes your voice locally, ensuring total confidentiality.</p>
-                </div>
-                <div class="bento-item">
-                    <i data-lucide="zap"></i>
-                    <h3>Low Latency</h3>
-                    <p>Optimized C++ backend provides near-instant transcription even on 4GB RAM systems.</p>
-                </div>
-                <div class="bento-item">
-                    <i data-lucide="keyboard"></i>
-                    <h3>Global Hook</h3>
-                    <p>Custom hotkey engine with OS-level suppression. Bind any combo without system conflicts.</p>
-                </div>
-                <div class="bento-item wide">
-                    <i data-lucide="layers"></i>
-                    <h3>Dynamic Pill UI</h3>
-                    <p>An elegant, non-intrusive overlay that floats at the bottom of your screen to show real-time processing status.</p>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <section id="how-it-works" class="section dark-bg">
-        <div class="container split">
-            <div class="text-side">
-                <h2 class="section-title">How it Works</h2>
-                <div class="step">
-                    <div class="number">01</div>
-                    <p><strong>Capture:</strong> Press your hotkey. Stype engages a low-latency audio stream via your system microphone.</p>
-                </div>
-                <div class="step">
-                    <div class="number">02</div>
-                    <p><strong>Inference:</strong> OpenAI's Whisper model (int8 quantized) performs deep-learning transcription on your CPU.</p>
-                </div>
-                <div class="step">
-                    <div class="number">03</div>
-                    <p><strong>Automation:</strong> Stype formats the text and simulates a system-level paste directly into your active cursor.</p>
-                </div>
-            </div>
-            <div class="visual-side">
-                <div class="glass-card">
-                    <div class="status-indicator">
-                        <div class="dot active"></div>
-                        <span>Processing AI...</span>
+        <section class="features">
+            <div class="section-container">
+                <div class="grid">
+                    <div class="card">
+                        <div class="card-icon"><i data-lucide="shield-check"></i></div>
+                        <h3>Absolute Privacy</h3>
+                        <p>Zero data leaves your machine. The Whisper AI engine runs entirely on your local hardware, ensuring your voice is never uploaded to the cloud.</p>
+                    </div>
+                    <div class="card">
+                        <div class="card-icon"><i data-lucide="zap"></i></div>
+                        <h3>Zero Latency</h3>
+                        <p>Powered by a deeply optimized C++ backend, Stype delivers near-instant transcription without the need for a dedicated GPU.</p>
+                    </div>
+                    <div class="card">
+                        <div class="card-icon"><i data-lucide="keyboard"></i></div>
+                        <h3>Global Injection</h3>
+                        <p>Bind any custom hotkey. Stype suppresses OS-level conflicts and injects your transcribed text directly into your active cursor position.</p>
                     </div>
                 </div>
             </div>
-        </div>
-    </section>
+        </section>
 
-    <section id="setup" class="section">
-        <div class="container">
-            <h2 class="section-title">Get Started</h2>
-            <div class="setup-steps">
-                <div class="setup-card">
-                    <i data-lucide="download-cloud"></i>
-                    <h4>Install</h4>
-                    <p>Run the Setup.exe and launch the application.</p>
-                </div>
-                <div class="setup-card">
-                    <i data-lucide="settings"></i>
-                    <h4>Configure</h4>
-                    <p>Right-click the tray icon to set your preferred global hotkey.</p>
-                </div>
-                <div class="setup-card">
-                    <i data-lucide="mic"></i>
-                    <h4>Speak</h4>
-                    <p>Press the hotkey, talk, and watch it type for you.</p>
+        <section id="legal" class="legal-section">
+            <div class="section-container">
+                <h2>Legal & Privacy</h2>
+                <div class="accordion-group">
+                    
+                    <details class="accordion">
+                        <summary>
+                            <span class="summary-title">Privacy Policy</span>
+                            <i data-lucide="chevron-down"></i>
+                        </summary>
+                        <div class="accordion-content">
+                            <div class="legal-text">
+                                <h4>Last Updated: March 22, 2026</h4>
+                                <p>At Stype, we believe your voice and your data belong exclusively to you. This policy outlines our strict, local-first approach to data handling.</p>
+                                
+                                <h5>1. Local Processing</h5>
+                                <p>Stype is a fully offline application. All audio captured via your microphone is processed locally on your computer using the Whisper AI model. No audio data is uploaded to the cloud, no text data is sent to external servers, and no internet connection is required for transcription.</p>
+                                
+                                <h5>2. Data Collection</h5>
+                                <p>Stype does not collect, store, or transmit any personally identifiable information (PII). We do not use cookies, tracking pixels, or telemetry.</p>
+                                
+                                <h5>3. System Permissions</h5>
+                                <p>To function, Stype requires temporary access to your microphone (for audio capture), keyboard hooks (to detect your global shortcut), and clipboard (to paste the resulting text).</p>
+                            </div>
+                        </div>
+                    </details>
+
+                    <details class="accordion">
+                        <summary>
+                            <span class="summary-title">License Agreement (Non-Commercial)</span>
+                            <i data-lucide="chevron-down"></i>
+                        </summary>
+                        <div class="accordion-content">
+                            <div class="legal-text">
+                                <h4>Stype License Agreement v1.0.0</h4>
+                                <p>Copyright (c) 2026 akasumitlamba</p>
+                                
+                                <h5>1. Grant of License</h5>
+                                <p>Permission is hereby granted, free of charge, to any person obtaining a copy of this software, to use, copy, and modify the Software for personal, educational, or research purposes.</p>
+                                
+                                <h5>2. Non-Commercial Restriction</h5>
+                                <p>The Software may NOT be used for commercial purposes. This includes selling the Software, using it to provide a paid service, or bundling it with commercial products.</p>
+                                
+                                <h5>3. Attribution & Share Alike</h5>
+                                <p>Any redistributions or modified versions must retain the copyright notice, link to the original repository, and be distributed under these exact same terms.</p>
+                                
+                                <h5>4. Disclaimer</h5>
+                                <p>THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED. IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE.</p>
+                            </div>
+                        </div>
+                    </details>
+
                 </div>
             </div>
-        </div>
-    </section>
+        </section>
+    </main>
 
     <footer>
-        <p>Developed with precision by <a href="https://github.com/akasumitlamba/">akasumitlamba</a></p>
+        <div class="footer-container">
+            <p>Designed and engineered by <a href="https://github.com/akasumitlamba/" target="_blank">akasumitlamba</a>.</p>
+        </div>
     </footer>
 
     <script src="script.js"></script>
