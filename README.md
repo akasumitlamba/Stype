@@ -1,5 +1,7 @@
 # 🎙️ Stype
 
+https://akasumitlamba.github.io/Stype/
+
 **AI-Powered Speech-to-Text for Windows** _The speed of thought, typed at the speed of sound._
 
 Stype is a lightweight, offline-first Windows desktop application that uses OpenAI's **Whisper** (via `faster-whisper`) to convert your speech into text instantly. It sits in your system tray, listens for a global hotkey, and pastes your dictated words directly into any active input field—browser, code editor, or Word doc.
