@@ -1,6 +1,6 @@
 # 🎙️ Stype
 
-https://akasumitlamba.github.io/Stype/
+Website Link : https://akasumitlamba.github.io/Stype/
 
 **AI-Powered Speech-to-Text for Windows** _The speed of thought, typed at the speed of sound._
 
