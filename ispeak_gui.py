@@ -1,10 +1,13 @@
 """
 Stype — Smart Voice Dictation Engine
-A polished, user-friendly speech-to-text tool with a premium floating pill overlay and dashboard.
+A polished, user-friendly speech-to-text tool with a premium floating pill overlay, dashboard, and auto-learning dictionary.
 """
 import sys
 import re
 import time
+import json
+import os
+import difflib
 import threading
 import numpy as np
 import sounddevice as sd
@@ -14,16 +17,150 @@ from faster_whisper import WhisperModel
 
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-    QLabel, QComboBox, QPushButton, QFrame, QScrollArea, QSizePolicy
+    QLabel, QComboBox, QPushButton, QFrame, QScrollArea, QSizePolicy,
+    QSystemTrayIcon, QMenu, QStackedWidget, QLineEdit
 )
 from PyQt6.QtCore import (
     Qt, pyqtSignal, QObject, QTimer, QPropertyAnimation,
-    QRect, QPoint
+    QRect, QPoint, QSharedMemory
 )
 from PyQt6.QtGui import (
     QFont, QColor, QPainter, QPen, QBrush,
-    QRadialGradient, QCursor, QPainterPath, QPalette, QLinearGradient
+    QRadialGradient, QCursor, QPainterPath, QPalette, QLinearGradient,
+    QIcon, QAction
 )
+
+# ═══════════════════════════════════════════════════════════
+#  DATA MANAGER (Persistence & Learning)
+# ═══════════════════════════════════════════════════════════
+DATA_FILE = "stype_data.json"
+
+class DataManager:
+    def __init__(self):
+        self.data = {
+            "dictionary": {
+                r'\bout words\b': 'outwards',
+                r'\bin words\b': 'inwards',
+                r'\bstype\b': 'Stype',
+            },
+            "history": []
+        }
+        self.load()
+        
+    def load(self):
+        if os.path.exists(DATA_FILE):
+            try:
+                with open(DATA_FILE, 'r') as f:
+                    loaded = json.load(f)
+                    self.data["dictionary"].update(loaded.get("dictionary", {}))
+                    self.data["history"] = loaded.get("history", [])
+            except Exception as e:
+                print(f"[Stype] Error loading data: {e}")
+                
+    def save(self):
+        try:
+            with open(DATA_FILE, 'w') as f:
+                json.dump(self.data, f, indent=4)
+        except Exception as e:
+            print(f"[Stype] Error saving data: {e}")
+            
+    def add_history(self, text):
+        self.data["history"].insert(0, text)
+        if len(self.data["history"]) > 30:
+            self.data["history"] = self.data["history"][:30]
+        self.save()
+        
+    def learn_correction(self, original, corrected):
+        if original == corrected:
+            return None, None
+            
+        orig_words = original.split()
+        corr_words = corrected.split()
+        
+        s = difflib.SequenceMatcher(None, orig_words, corr_words)
+        for tag, i1, i2, j1, j2 in s.get_opcodes():
+            if tag == 'replace':
+                wrong = " ".join(orig_words[i1:i2])
+                right = " ".join(corr_words[j1:j2])
+                
+                # Create a smart regex pattern for the wrong phrase
+                if re.search(r'\w', wrong):
+                    pattern = r'\b' + re.escape(wrong) + r'\b'
+                    self.data["dictionary"][pattern] = right
+                    self.save()
+                    return wrong, right
+        return None, None
+
+data_manager = DataManager()
+
+class CorrectionTracker:
+    def __init__(self, data_manager):
+        self.data_manager = data_manager
+        self.original_text = ""
+        self.current_text = ""
+        self.active = False
+        self.timer = None
+        self.hook = None
+        
+    def start(self, pasted_text):
+        self.original_text = pasted_text
+        self.current_text = pasted_text
+        self.active = True
+        
+        if self.hook is None:
+            self.hook = keyboard.on_press(self._on_key)
+            
+        self._reset_timer()
+        
+    def _reset_timer(self):
+        if self.timer:
+            self.timer.cancel()
+        self.timer = threading.Timer(6.0, self.finalize)
+        self.timer.start()
+        
+    def _on_key(self, event):
+        if not self.active:
+            return
+            
+        name = event.name
+        
+        if name in ['left', 'right', 'up', 'down', 'home', 'end', 'page up', 'page down', 'tab', 'enter', 'esc']:
+            self.finalize()
+            return
+            
+        if name in ['shift', 'caps lock', 'ctrl', 'alt', 'right shift', 'right ctrl', 'right alt', 'windows']:
+            return 
+            
+        self._reset_timer()
+        
+        if name == 'backspace':
+            if keyboard.is_pressed('ctrl'):
+                while len(self.current_text) > 0 and self.current_text[-1] == ' ':
+                    self.current_text = self.current_text[:-1]
+                while len(self.current_text) > 0 and self.current_text[-1] != ' ':
+                    self.current_text = self.current_text[:-1]
+            else:
+                self.current_text = self.current_text[:-1]
+        elif name == 'space':
+            self.current_text += ' '
+        elif len(name) == 1:
+            self.current_text += name
+            
+    def finalize(self):
+        if not self.active:
+            return
+        self.active = False
+        if self.timer:
+            self.timer.cancel()
+            
+        original = self.original_text.strip()
+        current = self.current_text.strip()
+        
+        if original != current and len(current) > 0:
+            wrong, right = self.data_manager.learn_correction(original, current)
+            if wrong and right:
+                print(f"[Global Tracker] Auto-learned: '{wrong}' -> '{right}'")
+
 
 # ═══════════════════════════════════════════════════════════
 #  CONSTANTS
@@ -40,7 +177,7 @@ STATES = {
     "ready":      {"label": "Ready",         "dot": "#00C853", "border": "rgba(0,200,83,0.15)"},
     "listening":  {"label": "Listening...",   "dot": "#FF4422", "border": "rgba(255,68,34,0.25)"},
     "processing": {"label": "Processing...", "dot": "#FFB420", "border": "rgba(255,180,32,0.25)"},
-    "pasted":     {"label": "Pasted",      "dot": "#2DCE6E", "border": "rgba(45,206,110,0.25)"},
+    "pasted":     {"label": "Pasted",        "dot": "#2DCE6E", "border": "rgba(45,206,110,0.25)"},
 }
 
 FORMATTING_PROMPT = (
@@ -51,33 +188,21 @@ FORMATTING_PROMPT = (
     "Sentences are properly capitalized."
 )
 
-SMART_REPLACEMENTS = {
-    r'\bout words\b': 'outwards',
-    r'\bin words\b': 'inwards',
-    r'\bstype\b': 'Stype',
-}
-
-# ═══════════════════════════════════════════════════════════
-#  SIGNALS
-# ═══════════════════════════════════════════════════════════
 class Signals(QObject):
     state_changed = pyqtSignal(str)          
     transcription_done = pyqtSignal(str)     
     model_progress = pyqtSignal(str)         
 
-
-# ═══════════════════════════════════════════════════════════
-#  POST-PROCESSOR
-# ═══════════════════════════════════════════════════════════
 def post_process(text: str) -> str:
     text = text.strip()
     if not text:
         return text
 
-    # Smart Context Replacements (Algorithm)
-    for pattern, replacement in SMART_REPLACEMENTS.items():
-        # Use regex to replace whole words only, preserving case natively handled by the user's speech mostly
-        text = re.sub(pattern, replacement, text, flags=re.IGNORECASE)
+    for pattern, replacement in data_manager.data["dictionary"].items():
+        try:
+            text = re.sub(pattern, replacement, text, flags=re.IGNORECASE)
+        except Exception:
+            pass
 
     ordinal_pattern = re.compile(
         r'\b(first(?:ly)?|second(?:ly)?|third(?:ly)?|fourth(?:ly)?|fifth(?:ly)?|'
@@ -153,7 +278,6 @@ class PillOverlay(QWidget):
             Qt.WindowType.Tool
         )
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
-        # Made pill narrower as requested
         self.setFixedSize(105, 34)
         
         self._state = "loading"
@@ -264,12 +388,12 @@ class PillOverlay(QWidget):
 
 
 # ═══════════════════════════════════════════════════════════
-#  HISTORY ITEM WIDGET
+#  HISTORY ITEM WIDGET (Editable & Auto-learning)
 # ═══════════════════════════════════════════════════════════
 class HistoryItem(QFrame):
     def __init__(self, text):
         super().__init__()
-        self.text = text
+        self.original_text = text
         self.setObjectName("HistoryItem")
         self.setStyleSheet("""
             QFrame#HistoryItem {
@@ -300,47 +424,107 @@ class HistoryItem(QFrame):
             QPushButton:hover {
                 background: rgba(255, 68, 34, 0.1);
             }
+            QLineEdit {
+                background: #1a1a1e;
+                border: 1px solid #ff4422;
+                border-radius: 4px;
+                padding: 4px;
+                color: #edece8;
+                font-family: 'Inter', 'Segoe UI', sans-serif;
+                font-size: 13px;
+            }
         """)
         layout = QHBoxLayout(self)
         layout.setContentsMargins(14, 14, 14, 14)
         
-        lbl = QLabel(text)
-        lbl.setWordWrap(True)
-        lbl.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-        layout.addWidget(lbl, stretch=1)
+        self.stack = QStackedWidget()
         
-        self.btn = QPushButton("Copy")
-        self.btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn.clicked.connect(self._copy)
-        self.btn.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
-        layout.addWidget(self.btn, alignment=Qt.AlignmentFlag.AlignTop)
+        self.lbl = QLabel(text)
+        self.lbl.setWordWrap(True)
+        self.lbl.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        self.stack.addWidget(self.lbl)
         
-    def _copy(self):
-        pyperclip.copy(self.text)
-        self.btn.setText("Copied!")
-        QTimer.singleShot(1500, lambda: self.btn.setText("Copy"))
+        self.editor = QLineEdit(text)
+        self.stack.addWidget(self.editor)
+        
+        layout.addWidget(self.stack, stretch=1)
+        
+        btn_layout = QVBoxLayout()
+        btn_layout.setSpacing(6)
+        
+        self.btn_copy = QPushButton("Copy")
+        self.btn_copy.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_copy.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        self.btn_copy.clicked.connect(self._handle_primary)
+        btn_layout.addWidget(self.btn_copy)
+        
+        self.btn_edit = QPushButton("Fix / Learn")
+        self.btn_edit.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_edit.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        self.btn_edit.clicked.connect(self._handle_secondary)
+        btn_layout.addWidget(self.btn_edit)
+        
+        layout.addLayout(btn_layout)
+        
+    def _handle_primary(self):
+        if self.stack.currentIndex() == 1:
+            # Save mode
+            corrected = self.editor.text().strip()
+            if corrected and corrected != self.original_text:
+                wrong, right = data_manager.learn_correction(self.original_text, corrected)
+                if wrong and right:
+                    print(f"[Stype] Learned: '{wrong}' -> '{right}'")
+                
+                # Update history in datamanager
+                try:
+                    idx = data_manager.data["history"].index(self.original_text)
+                    data_manager.data["history"][idx] = corrected
+                    data_manager.save()
+                except Exception:
+                    pass
+                
+            self.original_text = corrected
+            self.lbl.setText(corrected)
+            self.stack.setCurrentIndex(0)
+            self.btn_edit.setText("Fix / Learn")
+            self.btn_copy.setText("Copy")
+        else:
+            # Copy mode
+            pyperclip.copy(self.original_text)
+            self.btn_copy.setText("Copied!")
+            QTimer.singleShot(1500, lambda: self.btn_copy.setText("Copy"))
+            
+    def _handle_secondary(self):
+        if self.stack.currentIndex() == 0:
+            # Switch to Edit mode
+            self.stack.setCurrentIndex(1)
+            self.editor.setText(self.original_text)
+            self.editor.setFocus()
+            self.btn_edit.setText("Cancel")
+            self.btn_copy.setText("Save")
+        else:
+            # Cancel mode
+            self.stack.setCurrentIndex(0)
+            self.btn_edit.setText("Fix / Learn")
+            self.btn_copy.setText("Copy")
 
 
 # ═══════════════════════════════════════════════════════════
 #  PREMIUM BACKGROUND WIDGET
 # ═══════════════════════════════════════════════════════════
 class PremiumBackgroundWidget(QWidget):
-    """Draws the beautiful mesh gradient blobs from style.css"""
     def paintEvent(self, event):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
         w, h = self.width(), self.height()
         
-        # Base Dark Background
         p.fillRect(0, 0, w, h, QColor("#0a0a0c"))
         
-        # Blob 1: Orange at top left
         grad1 = QRadialGradient(w * 0.2, h * 0.3, w * 0.7)
         grad1.setColorAt(0, QColor(255, 68, 34, 18))
         grad1.setColorAt(1, QColor(255, 68, 34, 0))
         p.fillRect(0, 0, w, h, QBrush(grad1))
         
-        # Blob 2: Purple at top right
         grad2 = QRadialGradient(w * 0.8, h * 0.1, w * 0.6)
         grad2.setColorAt(0, QColor(120, 80, 255, 13))
         grad2.setColorAt(1, QColor(120, 80, 255, 0))
@@ -358,7 +542,6 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("Stype Dashboard")
         self.setFixedSize(450, 650)
         
-        # Global CSS resets
         self.setStyleSheet("""
             QWidget {
                 color: #edece8;
@@ -450,7 +633,6 @@ class MainWindow(QMainWindow):
         layout.setContentsMargins(28, 32, 28, 24)
         layout.setSpacing(20)
 
-        # Header
         header_layout = QHBoxLayout()
         title = QLabel("Stype Dashboard")
         title.setFont(QFont("Inter", 18, QFont.Weight.Bold))
@@ -462,7 +644,6 @@ class MainWindow(QMainWindow):
         header_layout.addWidget(self.status_label, alignment=Qt.AlignmentFlag.AlignRight)
         layout.addLayout(header_layout)
         
-        # Settings Card
         card = QFrame()
         card.setObjectName("card")
         card_layout = QVBoxLayout(card)
@@ -500,12 +681,10 @@ class MainWindow(QMainWindow):
         
         layout.addWidget(card)
         
-        # Log Section
         log_lbl = QLabel("Recent Transcriptions:")
         log_lbl.setFont(QFont("Inter", 11, QFont.Weight.DemiBold))
         layout.addWidget(log_lbl)
         
-        # Premium Scroll Area for History
         self.scroll = QScrollArea()
         self.scroll.setWidgetResizable(True)
         self.scroll_content = QWidget()
@@ -516,6 +695,11 @@ class MainWindow(QMainWindow):
         self.history_layout.setContentsMargins(0, 0, 12, 0)
         self.history_layout.setSpacing(10)
         
+        # Load persistent history
+        for text in data_manager.data["history"]:
+            item = HistoryItem(text)
+            self.history_layout.addWidget(item)
+            
         self.scroll.setWidget(self.scroll_content)
         layout.addWidget(self.scroll)
         
@@ -555,6 +739,8 @@ class StypeEngine:
         self.signals.state_changed.connect(self.dashboard.update_status)
         self.signals.transcription_done.connect(self._on_transcription)
         
+        self.tracker = CorrectionTracker(data_manager)
+        
         self._pasted_timer = QTimer()
         self._pasted_timer.setSingleShot(True)
         self._pasted_timer.timeout.connect(lambda: self.signals.state_changed.emit("ready"))
@@ -567,6 +753,23 @@ class StypeEngine:
         self.stream.start()
         
         keyboard.add_hotkey('ctrl+space', self._toggle)
+        
+        qapp = QApplication.instance()
+        icon_path = "icon.ico" if os.path.exists("icon.ico") else ""
+        self.tray_icon = QSystemTrayIcon(QIcon(icon_path), qapp)
+        self.tray_icon.setToolTip("Stype Dictation Engine")
+        
+        tray_menu = QMenu()
+        show_action = QAction("Show Dashboard", qapp)
+        show_action.triggered.connect(self.dashboard.show)
+        tray_menu.addAction(show_action)
+        tray_menu.addSeparator()
+        quit_action = QAction("Quit Completely", qapp)
+        quit_action.triggered.connect(qapp.quit)
+        tray_menu.addAction(quit_action)
+        
+        self.tray_icon.setContextMenu(tray_menu)
+        self.tray_icon.show()
         
         self.pill.show()
         self.dashboard.show()
@@ -626,13 +829,18 @@ class StypeEngine:
         self.audio_frames = []
         
         try:
-            # Important: condition_on_previous_text=False prevents Whisper stutter/loops!
+            # Build dynamic prompt with learned vocabulary
+            vocab = [v for v in data_manager.data["dictionary"].values() if v.isalpha()]
+            prompt = FORMATTING_PROMPT
+            if vocab:
+                prompt += " Vocabulary: " + ", ".join(list(set(vocab))[:50])
+
             segments, _ = self.model.transcribe(
                 audio_data,
                 beam_size=1,
                 vad_filter=True,
                 condition_on_previous_text=False,
-                initial_prompt=FORMATTING_PROMPT
+                initial_prompt=prompt
             )
             raw_text = "".join([s.text for s in segments]).strip()
             
@@ -649,16 +857,18 @@ class StypeEngine:
             self.processing = False
     
     def _on_transcription(self, text):
-        # Insert premium history item
+        data_manager.add_history(text)
+        
         item = HistoryItem(text)
         self.dashboard.history_layout.insertWidget(0, item)
         
-        # Paste safely
         pyperclip.copy(" " + text)
         keyboard.release('ctrl')
         keyboard.release('space')
         time.sleep(0.05)
         keyboard.send('ctrl+v')
+        
+        self.tracker.start(" " + text)
         
         self.signals.state_changed.emit("pasted")
         self._pasted_timer.start(2000)
@@ -667,6 +877,12 @@ class StypeEngine:
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
+    
+    shared_mem = QSharedMemory("StypeVoiceDictationLockID_v1")
+    if not shared_mem.create(1):
+        print("[Stype] Another instance is already running! Exiting immediately to prevent double pasting.")
+        sys.exit(0)
+        
     app.setQuitOnLastWindowClosed(False)
     engine = StypeEngine()
     sys.exit(app.exec())
