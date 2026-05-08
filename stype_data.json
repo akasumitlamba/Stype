@@ -3,7 +3,7 @@
         "hotkey": "ctrl+space",
         "model": "Balanced (Small)",
         "device": "CPU",
-        "language": "Hindi",
+        "language": "English",
         "mic_device": "",
         "auto_silence": true,
         "silence_seconds": 3.0

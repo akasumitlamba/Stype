@@ -223,26 +223,10 @@ class CorrectionTracker:
 #  CONSTANTS
 # ═══════════════════════════════════════════════════════════
 MODELS = {
-    "Fast (Base)":    "base",
-    "Balanced (Small)": "small",
-    "Accurate (Medium)": "medium",
+    "Fast (Base)":    "base.en",
+    "Balanced (Small)": "small.en",
+    "Accurate (Medium)": "medium.en",
     "Best (Large v3)": "large-v3",
-}
-
-LANGUAGES = {
-    "Auto-Detect": None,
-    "English": "en",
-    "Spanish": "es",
-    "French": "fr",
-    "German": "de",
-    "Italian": "it",
-    "Portuguese": "pt",
-    "Japanese": "ja",
-    "Chinese": "zh",
-    "Korean": "ko",
-    "Hindi": "hi",
-    "Russian": "ru",
-    "Arabic": "ar"
 }
 
 STATES = {
@@ -858,11 +842,6 @@ class MainWindow(QMainWindow):
         self.device_combo.setCurrentText(data_manager.get("device"))
         el.addLayout(make_row("Processing:", self.device_combo))
 
-        self.lang_combo = QComboBox()
-        self.lang_combo.addItems(list(LANGUAGES.keys()))
-        self.lang_combo.setCurrentText(data_manager.get("language"))
-        el.addLayout(make_row("Language:", self.lang_combo))
-
         el.addStretch()
 
         apply_btn = QPushButton("Apply & Reload Engine")
@@ -1017,7 +996,6 @@ class MainWindow(QMainWindow):
         device = "cuda" if "GPU" in self.device_combo.currentText() else "cpu"
         data_manager.set("model", model_name)
         data_manager.set("device", self.device_combo.currentText())
-        data_manager.set("language", self.lang_combo.currentText())
         self.model_changed.emit(model_id, device)
 
     def _on_save_audio(self):
@@ -1260,28 +1238,19 @@ class StypeEngine:
         self.audio_frames = []
 
         try:
-            # Language selection
-            lang_name = data_manager.get("language")
-            lang_code = LANGUAGES.get(lang_name)
-
             # Build dynamic prompt with learned vocabulary
             vocab = [v for v in data_manager.data["dictionary"].values() if v.isalpha()]
-            
-            # Use formatting prompt only for English to prevent hallucination in other languages
-            prompt = FORMATTING_PROMPT if lang_code == "en" else ""
+            prompt = FORMATTING_PROMPT
             if vocab:
-                vocab_str = "Vocabulary: " + ", ".join(list(set(vocab))[:50])
-                prompt = (prompt + " " + vocab_str).strip()
+                prompt += " Vocabulary: " + ", ".join(list(set(vocab))[:50])
 
             transcribe_kwargs = dict(
                 beam_size=1,
                 vad_filter=True,
-                condition_on_previous_text=False
+                condition_on_previous_text=False,
+                initial_prompt=prompt,
+                language="en"
             )
-            if prompt:
-                transcribe_kwargs["initial_prompt"] = prompt
-            if lang_code:
-                transcribe_kwargs["language"] = lang_code
 
             segments, _ = self.model.transcribe(audio_data, **transcribe_kwargs)
             raw_text = "".join([s.text for s in segments]).strip()
