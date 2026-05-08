@@ -1,10 +1,39 @@
 {
+    "settings": {
+        "hotkey": "ctrl+space",
+        "model": "Balanced (Small)",
+        "device": "CPU",
+        "language": "English",
+        "mic_device": "",
+        "auto_silence": true,
+        "silence_seconds": 3.0
+    },
     "dictionary": {
         "\\bout words\\b": "outwards",
         "\\bin words\\b": "inwards",
         "\\bstype\\b": "Stype"
     },
     "history": [
+        {
+            "text": "In the floating pill, if it is listening and showing animation, I don't want to see text in that place. So, keep it as listening UI only or just the text, not both as it looks ugly overall.",
+            "time": "2026-05-08T19:01:47.002355"
+        },
+        {
+            "text": "Maximize button does not work. It is still keeping the same size.",
+            "time": "2026-05-08T19:01:23.302320"
+        },
+        {
+            "text": "All dropdowns are transparent, so it is like making no sense, I cannot see anything.",
+            "time": "2026-05-08T19:01:09.089376"
+        },
+        {
+            "text": "and inwards, inwards, inwards.",
+            "time": "2026-05-08T19:00:32.323362"
+        },
+        {
+            "text": "It can be deleted or deleted or deleted a new delivery code.",
+            "time": "2026-05-08T18:59:59.822327"
+        },
         "Here is the recording link for reference."
     ]
 }

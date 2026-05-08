@@ -423,7 +423,7 @@ class PillOverlay(QWidget):
         p.setPen(highlight)
         p.drawLine(int(h / 2), 3, int(w - h / 2), 3)
 
-        dot_x, dot_y = 18, h // 2 - 3
+        dot_x, dot_y = 18, h // 2
         dot_color = QColor(state["dot"])
         if self._state == "listening" and not self._blink_on:
             dot_color.setAlpha(60)
@@ -440,21 +440,9 @@ class PillOverlay(QWidget):
         p.setBrush(QBrush(dot_color))
         p.drawEllipse(QPoint(dot_x, dot_y), 4, 4)
 
-        font = QFont("Inter", 8, QFont.Weight.Medium)
-        if not font.exactMatch(): font = QFont("Segoe UI", 8, QFont.Weight.Medium)
-        p.setFont(font)
-        p.setPen(QColor("#edece8"))
-        label = state["label"]
-        # Show recording duration
-        if self._state == "listening" and self._rec_start:
-            elapsed = time.time() - self._rec_start
-            label = f"Listening...  {elapsed:.0f}s"
-        text_rect = QRect(32, 0, w - 42, h // 2 + 4)
-        p.drawText(text_rect, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft, label)
-
-        # Audio level meter bar (only while listening)
         if self._state == "listening":
-            bar_x, bar_y = 32, h // 2 + 5
+            # Audio level meter bar only
+            bar_x, bar_y = 32, (h - 4) // 2
             bar_w = w - 50
             bar_h = 4
             # Background track
@@ -467,6 +455,15 @@ class PillOverlay(QWidget):
                 level_color = QColor("#ff4422") if self._audio_level > 0.8 else QColor("#2DCE6E") if self._audio_level < 0.5 else QColor("#FFB420")
                 p.setBrush(QBrush(level_color))
                 p.drawRoundedRect(bar_x, bar_y, fill_w, bar_h, 2, 2)
+        else:
+            # Text label only
+            font = QFont("Inter", 9, QFont.Weight.Medium)
+            if not font.exactMatch(): font = QFont("Segoe UI", 9, QFont.Weight.Medium)
+            p.setFont(font)
+            p.setPen(QColor("#edece8"))
+            label = state["label"]
+            text_rect = QRect(32, 0, w - 42, h)
+            p.drawText(text_rect, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft, label)
 
         p.end()
 
@@ -666,7 +663,7 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Stype Dashboard")
-        self.setFixedSize(440, 640)
+        self.setMinimumSize(440, 640)
 
         self.setStyleSheet("""
             QWidget {
@@ -712,11 +709,17 @@ class MainWindow(QMainWindow):
                 margin-right: 6px;
             }
             QComboBox QAbstractItemView {
-                background-color: #111114;
+                background-color: #1a1a1e;
                 border: 1px solid #272729;
-                selection-background-color: #1a1a1e;
                 color: #edece8;
-                outline: none;
+                outline: 0;
+            }
+            QComboBox QAbstractItemView::item {
+                padding: 8px 12px;
+                background-color: #1a1a1e;
+            }
+            QComboBox QAbstractItemView::item:selected {
+                background-color: #333338;
             }
             QPushButton#apply_btn {
                 background-color: #ff4422;
