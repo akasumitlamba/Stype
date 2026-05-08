@@ -647,25 +647,13 @@ class HistoryItem(QFrame):
 
 
 # ═══════════════════════════════════════════════════════════
-#  PREMIUM BACKGROUND WIDGET
+#  MINIMAL BACKGROUND WIDGET
 # ═══════════════════════════════════════════════════════════
 class PremiumBackgroundWidget(QWidget):
     def paintEvent(self, event):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
-        w, h = self.width(), self.height()
-        
-        p.fillRect(0, 0, w, h, QColor("#0a0a0c"))
-        
-        grad1 = QRadialGradient(w * 0.2, h * 0.3, w * 0.7)
-        grad1.setColorAt(0, QColor(255, 68, 34, 18))
-        grad1.setColorAt(1, QColor(255, 68, 34, 0))
-        p.fillRect(0, 0, w, h, QBrush(grad1))
-        
-        grad2 = QRadialGradient(w * 0.8, h * 0.1, w * 0.6)
-        grad2.setColorAt(0, QColor(120, 80, 255, 13))
-        grad2.setColorAt(1, QColor(120, 80, 255, 0))
-        p.fillRect(0, 0, w, h, QBrush(grad2))
+        p.fillRect(0, 0, self.width(), self.height(), QColor("#0a0a0c"))
 
 
 # ═══════════════════════════════════════════════════════════
@@ -678,7 +666,7 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Stype Dashboard")
-        self.setFixedSize(480, 780)
+        self.setFixedSize(440, 640)
 
         self.setStyleSheet("""
             QWidget {
@@ -776,8 +764,8 @@ class MainWindow(QMainWindow):
                 border-bottom: 2px solid transparent;
             }
             QTabBar::tab:selected {
-                color: #ff4422;
-                border-bottom: 2px solid #ff4422;
+                color: #edece8;
+                border-bottom: 2px solid #edece8;
             }
             QTabBar::tab:hover { color: #edece8; }
             QCheckBox {
@@ -864,7 +852,7 @@ class MainWindow(QMainWindow):
         el.addWidget(apply_btn)
 
         el.addStretch()
-        tabs.addTab(engine_tab, "⚙ Engine")
+        tabs.addTab(engine_tab, QIcon(os.path.join(DATA_DIR, "engine.svg")), " Engine")
 
         # ═══ TAB 2: Audio Settings
         audio_tab = QWidget()
@@ -913,7 +901,7 @@ class MainWindow(QMainWindow):
         al.addWidget(save_audio_btn)
 
         al.addStretch()
-        tabs.addTab(audio_tab, "🎤 Audio")
+        tabs.addTab(audio_tab, QIcon(os.path.join(DATA_DIR, "mic.svg")), " Audio")
 
         # ═══ TAB 3: History
         history_tab = QWidget()
@@ -925,7 +913,7 @@ class MainWindow(QMainWindow):
         # Search bar
         self.search_input = QLineEdit()
         self.search_input.setObjectName("search")
-        self.search_input.setPlaceholderText("🔍  Search transcriptions...")
+        self.search_input.setPlaceholderText("Search transcriptions...")
         self.search_input.textChanged.connect(self._on_search)
         hl.addWidget(self.search_input)
 
@@ -962,7 +950,7 @@ class MainWindow(QMainWindow):
         btn_row.addWidget(clear_btn)
         hl.addLayout(btn_row)
 
-        tabs.addTab(history_tab, "📝 History")
+        tabs.addTab(history_tab, QIcon(os.path.join(DATA_DIR, "history.svg")), " History")
 
         # ── Footer hint
         hotkey_text = data_manager.get("hotkey").upper().replace("+", " + ")
