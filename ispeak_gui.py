@@ -223,10 +223,26 @@ class CorrectionTracker:
 #  CONSTANTS
 # ═══════════════════════════════════════════════════════════
 MODELS = {
-    "Fast (Base)":    "base.en",
-    "Balanced (Small)": "small.en",
-    "Accurate (Medium)": "medium.en",
+    "Fast (Base)":    "base",
+    "Balanced (Small)": "small",
+    "Accurate (Medium)": "medium",
     "Best (Large v3)": "large-v3",
+}
+
+LANGUAGES = {
+    "Auto-Detect": None,
+    "English": "en",
+    "Spanish": "es",
+    "French": "fr",
+    "German": "de",
+    "Italian": "it",
+    "Portuguese": "pt",
+    "Japanese": "ja",
+    "Chinese": "zh",
+    "Korean": "ko",
+    "Hindi": "hi",
+    "Russian": "ru",
+    "Arabic": "ar"
 }
 
 STATES = {
@@ -1244,22 +1260,26 @@ class StypeEngine:
         self.audio_frames = []
 
         try:
-            # Build dynamic prompt with learned vocabulary
-            vocab = [v for v in data_manager.data["dictionary"].values() if v.isalpha()]
-            prompt = FORMATTING_PROMPT
-            if vocab:
-                prompt += " Vocabulary: " + ", ".join(list(set(vocab))[:50])
-
             # Language selection
             lang_name = data_manager.get("language")
             lang_code = LANGUAGES.get(lang_name)
 
+            # Build dynamic prompt with learned vocabulary
+            vocab = [v for v in data_manager.data["dictionary"].values() if v.isalpha()]
+            
+            # Use formatting prompt only for English to prevent hallucination in other languages
+            prompt = FORMATTING_PROMPT if lang_code == "en" else ""
+            if vocab:
+                vocab_str = "Vocabulary: " + ", ".join(list(set(vocab))[:50])
+                prompt = (prompt + " " + vocab_str).strip()
+
             transcribe_kwargs = dict(
                 beam_size=1,
                 vad_filter=True,
-                condition_on_previous_text=False,
-                initial_prompt=prompt
+                condition_on_previous_text=False
             )
+            if prompt:
+                transcribe_kwargs["initial_prompt"] = prompt
             if lang_code:
                 transcribe_kwargs["language"] = lang_code
 
