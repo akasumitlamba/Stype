@@ -15,6 +15,18 @@
     },
     "history": [
         {
+            "text": "Apply and reload engine button and save audio settings does not have any background which makes it differently identified that user have to save it. It looks more like a background text. So give the button a proper makeover so that user is able to identify and place them at the bottom instead of just there.",
+            "time": "2026-05-08T19:06:33.501209"
+        },
+        {
+            "text": "Second thing tell me that how the fix and learn will work. Because I have no idea how to test it.",
+            "time": "2026-05-08T19:05:48.909971"
+        },
+        {
+            "text": "Let the system listen to the active odd case when changing and then put it in there rather than letting the user type it in.",
+            "time": "2026-05-08T19:05:05.784174"
+        },
+        {
             "text": "In the floating pill, if it is listening and showing animation, I don't want to see text in that place. So, keep it as listening UI only or just the text, not both as it looks ugly overall.",
             "time": "2026-05-08T19:01:47.002355"
         },

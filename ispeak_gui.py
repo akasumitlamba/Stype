@@ -820,7 +820,6 @@ class MainWindow(QMainWindow):
 
         # ═══ TAB 1: Engine Settings
         engine_tab = QWidget()
-        engine_tab.setStyleSheet("background: transparent;")
         el = QVBoxLayout(engine_tab)
         el.setContentsMargins(0, 16, 0, 0)
         el.setSpacing(14)
@@ -848,18 +847,18 @@ class MainWindow(QMainWindow):
         self.lang_combo.setCurrentText(data_manager.get("language"))
         el.addLayout(make_row("Language:", self.lang_combo))
 
+        el.addStretch()
+
         apply_btn = QPushButton("Apply & Reload Engine")
         apply_btn.setObjectName("apply_btn")
         apply_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         apply_btn.clicked.connect(self._on_apply)
         el.addWidget(apply_btn)
 
-        el.addStretch()
         tabs.addTab(engine_tab, QIcon(os.path.join(DATA_DIR, "engine.svg")), " Engine")
 
         # ═══ TAB 2: Audio Settings
         audio_tab = QWidget()
-        audio_tab.setStyleSheet("background: transparent;")
         al = QVBoxLayout(audio_tab)
         al.setContentsMargins(0, 16, 0, 0)
         al.setSpacing(14)
@@ -873,10 +872,13 @@ class MainWindow(QMainWindow):
         hk_lbl = QLabel("Hotkey:")
         hk_lbl.setFont(QFont("Inter", 11))
         hk_row.addWidget(hk_lbl)
-        self.hotkey_input = QLineEdit(data_manager.get("hotkey"))
-        self.hotkey_input.setObjectName("search")
-        self.hotkey_input.setPlaceholderText("e.g. ctrl+space")
-        hk_row.addWidget(self.hotkey_input)
+        
+        self.current_hotkey_value = data_manager.get("hotkey") or "ctrl+space"
+        self.hotkey_btn = QPushButton(self.current_hotkey_value)
+        self.hotkey_btn.setObjectName("secondary_btn")
+        self.hotkey_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.hotkey_btn.clicked.connect(self._listen_hotkey)
+        hk_row.addWidget(self.hotkey_btn)
         al.addLayout(hk_row)
 
         # Auto-silence
@@ -897,18 +899,18 @@ class MainWindow(QMainWindow):
         silence_row.addWidget(self.silence_lbl)
         al.addLayout(silence_row)
 
+        al.addStretch()
+
         save_audio_btn = QPushButton("Save Audio Settings")
         save_audio_btn.setObjectName("apply_btn")
         save_audio_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         save_audio_btn.clicked.connect(self._on_save_audio)
         al.addWidget(save_audio_btn)
 
-        al.addStretch()
         tabs.addTab(audio_tab, QIcon(os.path.join(DATA_DIR, "mic.svg")), " Audio")
 
         # ═══ TAB 3: History
         history_tab = QWidget()
-        history_tab.setStyleSheet("background: transparent;")
         hl = QVBoxLayout(history_tab)
         hl.setContentsMargins(0, 12, 0, 0)
         hl.setSpacing(10)
@@ -979,6 +981,20 @@ class MainWindow(QMainWindow):
             if idx >= 0:
                 self.mic_combo.setCurrentIndex(idx)
 
+    def _listen_hotkey(self):
+        self.hotkey_btn.setText("Press key combo...")
+        self.hotkey_btn.setEnabled(False)
+        threading.Thread(target=self._capture_hotkey, daemon=True).start()
+
+    def _capture_hotkey(self):
+        hotkey = keyboard.read_hotkey(suppress=False)
+        QTimer.singleShot(0, lambda: self._on_hotkey_captured(hotkey))
+
+    def _on_hotkey_captured(self, hotkey):
+        self.current_hotkey_value = hotkey
+        self.hotkey_btn.setText(hotkey)
+        self.hotkey_btn.setEnabled(True)
+
     def _on_apply(self):
         model_name = self.model_combo.currentText()
         model_id = MODELS[model_name]
@@ -990,7 +1006,7 @@ class MainWindow(QMainWindow):
 
     def _on_save_audio(self):
         data_manager.set("mic_device", self.mic_combo.currentText())
-        data_manager.set("hotkey", self.hotkey_input.text().strip() or "ctrl+space")
+        data_manager.set("hotkey", self.current_hotkey_value.strip() or "ctrl+space")
         data_manager.set("auto_silence", self.auto_silence_cb.isChecked())
         data_manager.set("silence_seconds", self.silence_slider.value() / 10.0)
         hotkey_text = data_manager.get("hotkey").upper().replace("+", " + ")
