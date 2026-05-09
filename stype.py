@@ -41,7 +41,7 @@ from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QComboBox, QPushButton, QFrame, QScrollArea, QSizePolicy,
     QSystemTrayIcon, QMenu, QStackedWidget, QLineEdit, QFileDialog,
-    QCheckBox, QSlider, QTabWidget, QProgressBar, QTextEdit
+    QCheckBox, QSlider, QTabWidget, QProgressBar, QTextEdit, QStyle
 )
 from PyQt6.QtCore import (
     Qt, pyqtSignal, pyqtProperty, QObject, QTimer, QPropertyAnimation,
@@ -1097,6 +1097,13 @@ class MainWindow(QMainWindow):
                 min-height: 28px;
             }}
             QLineEdit:focus {{ border-color: {NB_ORANGE}; }}
+            QLineEdit#silence_input {{
+                padding: 2px 7px;
+                min-height: 22px;
+                max-height: 24px;
+                font-size: 12px;
+                font-weight: 600;
+            }}
             QTabWidget::pane {{
                 border: none;
                 background: transparent;
@@ -1169,7 +1176,8 @@ class MainWindow(QMainWindow):
         header.addWidget(self.status_label)
         quit_btn = QPushButton("Quit")
         quit_btn.setObjectName("quit_btn")
-        quit_btn.setFixedWidth(62)
+        quit_btn.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogCloseButton))
+        quit_btn.setFixedWidth(74)
         quit_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         quit_btn.setToolTip("Quit Stype completely")
         quit_btn.clicked.connect(QApplication.instance().quit)
@@ -1215,6 +1223,7 @@ class MainWindow(QMainWindow):
         self.launch_startup_cb = ToggleSwitch()
         startup_enabled = bool(data_manager.get("launch_on_startup")) or is_launch_on_startup_enabled()
         self.launch_startup_cb.setChecked(startup_enabled)
+        self.launch_startup_cb.toggled.connect(self._on_startup_toggled)
         startup_row.addWidget(self.launch_startup_cb)
         startup_row.addWidget(QLabel("Start Stype when Windows signs in"))
         startup_row.addStretch()
@@ -1278,8 +1287,9 @@ class MainWindow(QMainWindow):
         sec_lbl.setStyleSheet(f"color: {NB_INK}; font-size: 12px; font-weight: 600;")
         sec_row.addWidget(sec_lbl)
         self.silence_input = QLineEdit()
-        self.silence_input.setFixedWidth(64)
-        self.silence_input.setFixedHeight(24)
+        self.silence_input.setObjectName("silence_input")
+        self.silence_input.setFixedWidth(48)
+        self.silence_input.setFixedHeight(26)
         self.silence_input.setPlaceholderText("3.0")
         self.silence_input.setText(f"{data_manager.get('silence_seconds'):.1f}")
         sec_row.addWidget(self.silence_input)
@@ -1488,14 +1498,23 @@ class MainWindow(QMainWindow):
         model_name = self.model_combo.currentText()
         model_id = MODELS[model_name]
         device = "cuda" if "GPU" in self.device_combo.currentText() else "cpu"
-        launch_on_startup = self.launch_startup_cb.isChecked()
         data_manager.set("model", model_name)
         data_manager.set("device", self.device_combo.currentText())
+        self.model_changed.emit(model_id, device)
+
+    def _on_startup_toggled(self, checked):
+        launch_on_startup = bool(checked)
         data_manager.set("launch_on_startup", launch_on_startup)
         if set_launch_on_startup(launch_on_startup):
             self.status_label.setText("Startup Saved")
             self.status_label.setStyleSheet(f"color: white; background: {NB_GREEN}; padding: 4px 10px; border: 2px solid {NB_BORDER};")
-        self.model_changed.emit(model_id, device)
+        else:
+            data_manager.set("launch_on_startup", not launch_on_startup)
+            self.launch_startup_cb.blockSignals(True)
+            self.launch_startup_cb.setChecked(not launch_on_startup)
+            self.launch_startup_cb.blockSignals(False)
+            self.status_label.setText("Startup Failed")
+            self.status_label.setStyleSheet(f"color: white; background: {NB_PINK}; padding: 4px 10px; border: 2px solid {NB_BORDER};")
 
     def _on_save_audio(self):
         data_manager.set("mic_device", self.mic_combo.currentText())
@@ -1630,7 +1649,7 @@ class StypeEngine:
 
         self._pasted_timer = QTimer()
         self._pasted_timer.setSingleShot(True)
-        self._pasted_timer.timeout.connect(lambda: self.signals.state_changed.emit("ready"))
+        self._pasted_timer.timeout.connect(lambda: self._emit_state("ready"))
 
         # Stream is created on demand
         
@@ -1670,6 +1689,14 @@ class StypeEngine:
         saved_device = data_manager.get("device")
         device = "cuda" if "GPU" in saved_device else "cpu"
         threading.Thread(target=self._load_model, args=(model_id, device), daemon=True).start()
+
+    def _emit_state(self, state_key):
+        if state_key == "ready":
+            if self.recording:
+                state_key = "listening"
+            elif self.processing:
+                state_key = "processing"
+        self.signals.state_changed.emit(state_key)
 
     def _start_audio_stream(self):
         """Create or recreate the audio input stream with current mic settings."""
@@ -1758,7 +1785,7 @@ class StypeEngine:
             self._stop_audio_stream()
             self.processing = True
             self.cancelled = False
-            self.signals.state_changed.emit("processing")
+            self._emit_state("processing")
             threading.Thread(target=self._process, daemon=True).start()
 
     def _cancel(self):
@@ -1766,13 +1793,13 @@ class StypeEngine:
             self.recording = False
             self._stop_audio_stream()
             self.audio_frames = []
-            self.signals.state_changed.emit("ready")
+            self._emit_state("ready")
             self.tray_icon.setToolTip("Stype — Ready")
         elif self.processing:
             self.cancelled = True
             self.processing = False
             self.audio_frames = []
-            self.signals.state_changed.emit("ready")
+            self._emit_state("ready")
             self.tray_icon.setToolTip("Stype — Ready")
 
     def _toggle(self):
@@ -1785,7 +1812,7 @@ class StypeEngine:
             return
 
         if not self.recording:
-            self.signals.state_changed.emit("starting_mic")
+            self._emit_state("starting_mic")
             self.tray_icon.setToolTip("Stype — Opening Mic...")
             self.audio_frames = []
             self._silence_frames = 0
@@ -1795,7 +1822,7 @@ class StypeEngine:
             self._stop_audio_stream()
             self.processing = True
             self.cancelled = False
-            self.signals.state_changed.emit("processing")
+            self._emit_state("processing")
             self.tray_icon.setToolTip("Stype — Processing...")
             threading.Thread(target=self._process, daemon=True).start()
 
@@ -1803,14 +1830,14 @@ class StypeEngine:
         self._start_audio_stream()
         if hasattr(self, 'stream') and self.stream is not None:
             self.recording = True
-            self.signals.state_changed.emit("listening")
+            self._emit_state("listening")
             self.tray_icon.setToolTip("Stype — Recording...")
         else:
-            self.signals.state_changed.emit("ready")
+            self._emit_state("ready")
             self.tray_icon.setToolTip("Stype — Ready")
 
     def _load_model(self, model_id, device):
-        self.signals.state_changed.emit("loading")
+        self._emit_state("loading")
         try:
             compute_type = "float16" if device == "cuda" else "int8"
             self.model = WhisperModel(
@@ -1821,11 +1848,11 @@ class StypeEngine:
                 num_workers=1,
                 download_root=os.path.join(DATA_DIR, "whisper_model")
             )
-            self.signals.state_changed.emit("ready")
+            self._emit_state("ready")
             self.tray_icon.setToolTip("Stype — Ready")
         except Exception as e:
             print(f"[Stype] Model load error: {e}")
-            self.signals.state_changed.emit("ready")
+            self._emit_state("ready")
 
     def _reload_model(self, model_id, device):
         self.model = None
@@ -1834,7 +1861,7 @@ class StypeEngine:
     def _process(self):
         if not self.audio_frames:
             self.processing = False
-            self.signals.state_changed.emit("ready")
+            self._emit_state("ready")
             self.tray_icon.setToolTip("Stype — Ready")
             return
 
@@ -1876,13 +1903,13 @@ class StypeEngine:
                 final_text = post_process(raw_text)
                 self.signals.transcription_done.emit(final_text)
             else:
-                self.signals.state_changed.emit("ready")
+                self._emit_state("ready")
                 self.tray_icon.setToolTip("Stype — Ready")
                 self.processing = False
 
         except Exception as e:
             print(f"[Stype] Transcription error: {e}")
-            self.signals.state_changed.emit("ready")
+            self._emit_state("ready")
             self.processing = False
 
     def _on_transcription(self, text):
@@ -1905,7 +1932,7 @@ class StypeEngine:
         keyboard.send('ctrl+v')
 
 
-        self.signals.state_changed.emit("pasted")
+        self._emit_state("pasted")
         self.tray_icon.setToolTip("Stype — Ready")
         self._pasted_timer.start(2000)
         self.processing = False

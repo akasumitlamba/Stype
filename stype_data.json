@@ -25,6 +25,46 @@
     ],
     "history": [
         {
+            "text": "Once upon a time, there was a crow.",
+            "time": "2026-05-09T21:14:06.200972"
+        },
+        {
+            "text": "Testing, testing, testing, testing, testing, testing, testing, testing, testing, testing, testing.",
+            "time": "2026-05-09T21:13:53.947077"
+        },
+        {
+            "text": "One more thing I have noticed, sometimes when the app is listening, it defaults back to normal dots colored but not pulsing and the x icon is not there. This seems like a bug but it actually listens but it is hiding the feedback so find this bug and fix it.",
+            "time": "2026-05-09T21:02:15.253755"
+        },
+        {
+            "text": "So that all the contents remain visible and nothing is, you know, excluded from the initial view and all the other views as well.",
+            "time": "2026-05-09T21:01:45.187316"
+        },
+        {
+            "text": "For the website, make every page the exact height of the user screen. Not more than that, not less than that. Make every page the exact height but allow scrolling. Are you getting my point?",
+            "time": "2026-05-09T21:01:31.611233"
+        },
+        {
+            "text": "Some sections of the website are not properly resizing to the mobile orientation. Fix those too.",
+            "time": "2026-05-09T21:00:50.944148"
+        },
+        {
+            "text": "Add a icon to the quit button also.",
+            "time": "2026-05-09T21:00:23.822799"
+        },
+        {
+            "text": "There is still too much gap on the dashboard window between the status and the quit button. Reduce the gap.",
+            "time": "2026-05-09T21:00:14.219923"
+        },
+        {
+            "text": "And the box of duration in the audio settings is too big.",
+            "time": "2026-05-09T20:59:29.411805"
+        },
+        {
+            "text": "The toggle of the startup is not working in the engine.",
+            "time": "2026-05-09T20:59:00.045604"
+        },
+        {
             "text": "Keep the index file in root folder as well and adjust other with respect to it.",
             "time": "2026-05-09T20:38:57.773530"
         },

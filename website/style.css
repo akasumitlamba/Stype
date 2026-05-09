@@ -16,6 +16,7 @@
   --radius: 8px;
   --font: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  --nav-h: 74px;
 }
 
 * {
@@ -102,7 +103,7 @@ select {
   align-items: center;
   gap: 10px;
   font-weight: 950;
-  letter-spacing: -0.02em;
+  letter-spacing: 0;
 }
 
 .brand-mark {
@@ -185,11 +186,14 @@ select {
 }
 
 .section-band {
-  padding: clamp(58px, 8vw, 110px) clamp(18px, 5vw, 72px);
+  height: calc(100svh - var(--nav-h));
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  padding: clamp(18px, 3.5vw, 44px) clamp(18px, 5vw, 72px);
 }
 
 .hero {
-  min-height: calc(100svh - 74px);
   display: grid;
   grid-template-columns: minmax(0, 1.02fr) minmax(320px, 0.98fr);
   align-items: center;
@@ -225,10 +229,10 @@ p {
 
 h1 {
   max-width: 860px;
-  margin-bottom: 24px;
-  font-size: clamp(48px, 8vw, 112px);
-  line-height: 0.88;
-  letter-spacing: -0.055em;
+  margin-bottom: 18px;
+  font-size: clamp(42px, 6vw, 70px);
+  line-height: 0.92;
+  letter-spacing: 0;
   font-weight: 950;
 }
 
@@ -236,14 +240,14 @@ h2 {
   margin-bottom: 18px;
   font-size: clamp(34px, 5vw, 70px);
   line-height: 0.96;
-  letter-spacing: -0.045em;
+  letter-spacing: 0;
   font-weight: 950;
 }
 
 h3 {
-  font-size: 22px;
+  font-size: 20px;
   line-height: 1.02;
-  letter-spacing: -0.025em;
+  letter-spacing: 0;
   font-weight: 950;
 }
 
@@ -252,7 +256,7 @@ h3 {
 .download-band p {
   max-width: 720px;
   color: var(--muted);
-  font-size: clamp(17px, 1.6vw, 22px);
+  font-size: clamp(16px, 1.35vw, 19px);
   font-weight: 650;
 }
 
@@ -260,7 +264,7 @@ h3 {
   display: flex;
   flex-wrap: wrap;
   gap: 14px;
-  margin: 34px 0 26px;
+  margin: 18px 0 14px;
 }
 
 .hero-stats {
@@ -273,7 +277,7 @@ h3 {
 }
 
 .hero-stats div {
-  padding: 16px;
+  padding: 8px 14px;
   border-right: var(--line);
 }
 
@@ -283,7 +287,7 @@ h3 {
 
 .hero-stats strong {
   display: block;
-  font-size: 30px;
+  font-size: 24px;
   line-height: 1;
   font-weight: 950;
 }
@@ -299,7 +303,7 @@ h3 {
 
 .hero-product {
   position: relative;
-  min-height: 620px;
+  min-height: min(430px, 100%);
 }
 
 .window {
@@ -312,9 +316,9 @@ h3 {
 .dashboard-window {
   position: relative;
   z-index: 2;
-  width: min(100%, 520px);
+  width: min(100%, 500px);
   margin-left: auto;
-  padding: 22px;
+  padding: 18px;
 }
 
 .window-top {
@@ -347,7 +351,7 @@ h3 {
 .window-actions {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 4px;
   flex-shrink: 0;
 }
 
@@ -355,6 +359,7 @@ h3 {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 5px;
   min-height: 30px;
   padding: 5px 10px;
   border: 2px solid var(--ink);
@@ -364,9 +369,21 @@ h3 {
   font-weight: 950;
 }
 
+.quit-chip::before {
+  content: "x";
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border: 1.5px solid #fff;
+  line-height: 1;
+  font-size: 10px;
+}
+
 .tab-row {
   display: flex;
-  margin-bottom: 20px;
+  margin-bottom: 16px;
   overflow-x: auto;
   scrollbar-width: none;
 }
@@ -389,7 +406,7 @@ h3 {
 }
 
 .field {
-  margin-bottom: 18px;
+  margin-bottom: 14px;
 }
 
 .field label {
@@ -405,8 +422,8 @@ h3 {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  min-height: 48px;
-  padding: 10px 14px;
+  min-height: 42px;
+  padding: 8px 14px;
   border: 2px solid var(--ink);
   background: #fff;
   font-weight: 850;
@@ -422,7 +439,7 @@ h3 {
 
 .mock-button {
   width: 100%;
-  min-height: 52px;
+  min-height: 46px;
   border: var(--line);
   background: var(--orange);
   color: #fff;
@@ -500,7 +517,7 @@ h3 {
   bottom: 0;
   z-index: 1;
   width: min(76%, 420px);
-  min-height: 210px;
+  min-height: 170px;
   transform: rotate(2deg);
 }
 
@@ -596,18 +613,18 @@ h3 {
 }
 
 .story-window {
-  min-height: 540px;
+  min-height: min(470px, calc(100svh - var(--nav-h) - 72px));
   padding: clamp(16px, 3vw, 24px);
 }
 
 .story-panel {
-  min-height: 370px;
+  min-height: 300px;
 }
 
 .app-form {
   position: relative;
-  min-height: 370px;
-  padding-bottom: 68px;
+  min-height: 300px;
+  padding-bottom: 56px;
 }
 
 .app-form label {
@@ -626,8 +643,8 @@ h3 {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  min-height: 54px;
-  margin-bottom: 22px;
+  min-height: 46px;
+  margin-bottom: 16px;
   padding: 0 16px;
   border: 2px solid var(--ink);
   background: #fff;
@@ -666,7 +683,7 @@ h3 {
 
 .app-help,
 .dictionary-preview p {
-  margin: -14px 0 22px;
+  margin: -10px 0 16px;
   color: var(--muted);
   font-size: 13px;
   font-weight: 700;
@@ -677,7 +694,7 @@ h3 {
   left: 0;
   right: 0;
   bottom: 0;
-  min-height: 56px;
+  min-height: 48px;
   border: var(--line);
   background: var(--orange);
   color: #fff;
@@ -688,7 +705,7 @@ h3 {
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-bottom: 20px;
+  margin-bottom: 16px;
 }
 
 .mini-toggle {
@@ -722,8 +739,8 @@ h3 {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 64px;
-  height: 48px;
+  width: 48px;
+  height: 32px;
   border: 2px solid var(--ink);
   background: #fff;
 }
@@ -833,12 +850,12 @@ h3 {
 
 .story-copy {
   display: grid;
-  gap: 28vh;
-  padding-bottom: 20vh;
+  gap: clamp(22px, 6vh, 48px);
+  padding-bottom: 0;
 }
 
 .story-step {
-  min-height: 56vh;
+  min-height: min(44vh, 360px);
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -861,20 +878,20 @@ h3 {
 
 .section-heading {
   max-width: 940px;
-  margin-bottom: clamp(28px, 5vw, 56px);
+  margin-bottom: clamp(18px, 3vw, 32px);
 }
 
 .feature-grid,
 .workflow-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 18px;
+  gap: 14px;
 }
 
 .feature-card,
 .flow-card {
-  min-height: 250px;
-  padding: 24px;
+  min-height: 160px;
+  padding: 14px 18px;
   border: var(--line);
   border-radius: var(--radius);
   background: var(--card);
@@ -887,8 +904,8 @@ h3 {
   align-items: center;
   justify-content: center;
   min-width: 42px;
-  height: 34px;
-  margin-bottom: 28px;
+  height: 30px;
+  margin-bottom: 12px;
   border: 2px solid var(--ink);
   background: #fff;
   color: var(--ink);
@@ -899,6 +916,8 @@ h3 {
 .feature-card p,
 .flow-card p {
   color: rgba(26, 26, 46, 0.72);
+  font-size: 14px;
+  line-height: 1.35;
   font-weight: 750;
 }
 
@@ -944,7 +963,7 @@ h3 {
 }
 
 .flow-card {
-  min-height: 230px;
+  min-height: 155px;
 }
 
 .flow-card strong {
@@ -1033,6 +1052,10 @@ h3 {
 }
 
 @media (max-width: 980px) {
+  :root {
+    --nav-h: 68px;
+  }
+
   .nav-links {
     display: none;
   }
@@ -1044,7 +1067,7 @@ h3 {
   }
 
   .hero-product {
-    min-height: 560px;
+    min-height: 480px;
   }
 
   .dashboard-window {
@@ -1059,6 +1082,10 @@ h3 {
   .story-copy {
     gap: 28px;
     padding-bottom: 0;
+  }
+
+  .story-window {
+    min-height: 430px;
   }
 
   .story-step {
@@ -1080,7 +1107,15 @@ h3 {
 }
 
 @media (max-width: 640px) {
+  :root {
+    --nav-h: 66px;
+  }
+
   .section-band {
+    height: calc(100svh - var(--nav-h));
+    overflow-y: auto;
+    padding-top: 24px;
+    padding-bottom: 24px;
     padding-left: 20px;
     padding-right: 20px;
   }
@@ -1143,7 +1178,7 @@ h3 {
   }
 
   .hero-product {
-    min-height: 600px;
+    min-height: 430px;
   }
 
   .dashboard-window {
@@ -1152,20 +1187,67 @@ h3 {
 
   .window-top {
     align-items: flex-start;
-    flex-direction: column;
+    flex-direction: row;
+    gap: 8px;
+  }
+
+  .window-top strong {
+    font-size: 18px;
+  }
+
+  .status-chip,
+  .quit-chip {
+    min-height: 28px;
+    padding: 4px 7px;
+    font-size: 11px;
   }
 
   .floating-pill {
     left: 0;
-    bottom: 216px;
+    bottom: 150px;
   }
 
   .hero-shot {
-    width: 92%;
+    width: 86%;
+    min-height: 160px;
   }
 
   .tab-row span {
-    min-width: 112px;
+    min-width: 96px;
+    padding: 9px 11px;
+  }
+
+  .story-window {
+    min-height: 390px;
+  }
+
+  .story-panel,
+  .app-form {
+    min-height: 300px;
+  }
+
+  .dict-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .dict-row {
+    grid-template-columns: 1fr;
+    gap: 7px;
+  }
+
+  .history-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .history-card {
+    min-height: 150px;
+    padding: 16px 16px 48px;
+  }
+
+  .history-card button {
+    position: static;
+    margin-top: 8px;
   }
 
   .site-footer {
