@@ -6,7 +6,8 @@
         "language": "English",
         "mic_device": "System Default",
         "auto_silence": true,
-        "silence_seconds": 3.0
+        "silence_seconds": 3.0,
+        "launch_on_startup": false
     },
     "personal_dict": [
         {
@@ -24,64 +25,12 @@
     ],
     "history": [
         {
-            "text": "Read the new features, designs, layout changes, new dashboard, what it includes, and everything. Keep the placeholders for the images and tell me where to add which images. You can go multiple apps in the lab or whatever. You can also put a scrolling stop animations. I won't reach animations in the UI. Like if I scroll something stays on the left side but scrolls on the right side with the text But the image stays and all those kind of things if needed incorporate them all I'm counting on you make no mistakes.",
-            "time": "2026-05-09T19:50:13.996348"
+            "text": "The icon should not be too much cluttered. It has to be a simple and clean. Do not mess this up.",
+            "time": "2026-05-09T20:32:20.673678"
         },
         {
-            "text": "Read the design language of the actual app in this project. And then according to that, redesign the website completely. Also write what the new features are in there and etc. Do a complete overhaul as this is the new version which is different than the last one which has some other kind of design. So yeah, incorporate this new design into the website and make website should be static only because I am hosting it on GitHub pages.",
-            "time": "2026-05-09T19:49:15.984096"
-        },
-        {
-            "text": "Okay, yes, correct.",
-            "time": "2026-05-09T19:48:24.539279"
-        },
-        {
-            "text": "Just one thing, can you make the tick of that pasted more uniboxy type? It is the curved tick. I want it to be a proper boxy tick to fit the theme.",
-            "time": "2026-05-09T19:46:02.685171"
-        },
-        {
-            "text": "Rest everything is looking fine.",
-            "time": "2026-05-09T19:45:39.912607"
-        },
-        {
-            "text": "Ola ami wo s, I see some white leakage on the left part of this. I don't think this is supposed to be happening.",
-            "time": "2026-05-09T19:45:14.203254"
-        },
-        {
-            "text": "Hello hello hello hello hello hello-.",
-            "time": "2026-05-09T19:42:52.977193"
-        },
-        {
-            "text": "It looks empty. There's something hiding. In 1970, a group of Soviet scientists started drilling right here. For 28 years, they kept going and going until, after nearly 4000 meters, they suddenly stopped. Because they had found something unimaginable. Liquid water. a secret lake down below all this ice that had been completely sealed off from the rest of the world for 15 million years. How? And is there something alive in there? Creatures that have been evolving separately from the rest of the planet for 15 million years. So scientists started searching for more of these secret lakes. and as.",
-            "time": "2026-05-09T19:39:54.380095"
-        },
-        {
-            "text": "Okay, how it will process. I want to see if I speak a very long length of text and hopefully this works fine. But I don't know what else to say. Human resource executive at Reliance Technology reached to blah blah blah apply pending at humatra hr solution system integration and test engineer.",
-            "time": "2026-05-09T19:38:26.609019"
-        },
-        {
-            "text": "This is the test 2. 1 2 1 2, test 2, test 2.",
-            "time": "2026-05-09T19:37:52.390270"
-        },
-        {
-            "text": "Is it working? 1, 2, 3, 4, 5, 6. Is it working?",
-            "time": "2026-05-09T19:35:49.717463"
-        },
-        {
-            "text": "new google health app which is basically a rebranded version of the fitbit app and while the free tier handles the basics like activities sleep and step tracking the advanced gemini powered ai features require a ten dollar per month subscription that unlocks features like photo based meal logging adaptive fitness plans detailed sleep insights and an ai coach the band drops on may 26 with three months of subscription completely free though if you're already a google ai pro or ultra subscriber the subscription gets included by default overall it's interesting to see google competing in the same space as now are you getting one.",
-            "time": "2026-05-09T19:23:06.554930"
-        },
-        {
-            "text": "Every single day.",
-            "time": "2026-05-09T19:21:14.277829"
-        },
-        {
-            "text": "The transcription is taking hell lot of time. So, that is not good. And also, I want few more themes to be incorporated in this. Because some people may not like the new Brutalism theme. So, yeah, please put some more themes in there. And in the settings, let the people choose. keep the old one as well which you removed so yeah people would like that too keep this one and like two three more.",
-            "time": "2026-05-09T19:04:36.148609"
-        },
-        {
-            "text": "Design the website using this similar language as well and also redesign the pill so that it looks a bit more clean because currently I think it is all right but there is some gap in what I see so yeah consider that as well but yeah design the website as and do that do this after that.",
-            "time": "2026-05-09T19:02:59.327836"
+            "text": "Hello, hello, hello, hello, hello, hello-.",
+            "time": "2026-05-09T20:30:29.913541"
         }
     ]
 }

@@ -1,136 +1,171 @@
-/* ═══════════════════════════════════════════════════
-   STYPE  —  script.js
-═══════════════════════════════════════════════════ */
-
 (function () {
-  'use strict';
+  "use strict";
 
-  /* ── Theme Toggle ─────────────────────────────── */
-  const html = document.documentElement;
-  const themeBtn = document.getElementById('theme-toggle');
-  const STORAGE_KEY = 'stype-theme';
+  const nav = document.querySelector("[data-sticky-nav]");
+  const storySteps = Array.from(document.querySelectorAll("[data-story]"));
+  const storyPanel = document.querySelector("[data-story-panel]");
+  const storyTitle = document.querySelector("[data-story-title]");
+  const storyStatus = document.querySelector("[data-story-status]");
+  const tabs = Array.from(document.querySelectorAll("[data-tab]"));
 
-  function applyTheme(theme) {
-    html.setAttribute('data-theme', theme);
-    localStorage.setItem(STORAGE_KEY, theme);
+  const storyContent = {
+    engine: {
+      title: "Engine",
+      status: "Ready"
+    },
+    audio: {
+      title: "Audio",
+      status: "Ready"
+    },
+    dictionary: {
+      title: "Dictionary",
+      status: "Ready"
+    },
+    history: {
+      title: "History",
+      status: "Ready"
+    }
+  };
+
+  const storyTemplates = {
+    engine: () => `
+      <div class="app-form engine-preview">
+        <label>Accuracy Model</label>
+        <div class="app-select">Balanced (Small)<span></span></div>
+        <label>Processing Device</label>
+        <div class="app-select">CPU<span></span></div>
+        <div class="app-toggle-row">
+          <span class="mini-toggle on"><i></i></span>
+          <strong>Start Stype when Windows signs in</strong>
+        </div>
+        <button class="app-primary">Apply Reload Engine</button>
+      </div>
+    `,
+    audio: () => `
+      <div class="app-form audio-preview">
+        <label>Microphone</label>
+        <div class="app-select">System Default<span></span></div>
+        <label>Global Hotkey</label>
+        <div class="app-hotkey">CTRL+SPACE</div>
+        <p class="app-help">Click to change - then press your new key combo</p>
+        <label>Auto-Stop on Silence</label>
+        <div class="app-toggle-row">
+          <span class="mini-toggle on"><i></i></span>
+          <strong>Enable auto-stop after silence</strong>
+        </div>
+        <div class="duration-row"><span>Duration:</span><b>3.0</b><span>seconds</span></div>
+        <button class="app-primary">Save Audio Settings</button>
+      </div>
+    `,
+    dictionary: () => `
+      <div class="dictionary-preview">
+        <div class="dict-head">
+          <strong>Personal Dictionary</strong>
+          <span><button>+ Word</button><button>+ Replacement</button></span>
+        </div>
+        <p>Add words to improve recognition, or set replacements.</p>
+        <div class="dict-row"><b>Replace</b><span>out words</span><i>-></i><span>outwards</span><button>x</button></div>
+        <div class="dict-row"><b>Replace</b><span>in words</span><i>-></i><span>inwards</span><button>x</button></div>
+        <div class="dict-row"><b>Replace</b><span>stype</span><i>-></i><span>Stype</span><button>x</button></div>
+      </div>
+    `,
+    history: () => `
+      <div class="history-preview">
+        <div class="search-like">Search transcriptions...</div>
+        <div class="history-card">
+          <p>Notes from a long dictation are stored locally with word count and character count.</p>
+          <button>Copy</button>
+          <small>just now · 188 words · 1027 chars</small>
+        </div>
+        <div class="history-actions">
+          <button>Import History</button>
+          <button>Export History</button>
+          <button>Clear All</button>
+        </div>
+      </div>
+    `
+  };
+
+  function setScrolledNav() {
+    if (!nav) return;
+    nav.classList.toggle("is-scrolled", window.scrollY > 8);
   }
 
-  // Restore saved preference
-  const saved = localStorage.getItem(STORAGE_KEY);
-  if (saved === 'light' || saved === 'dark') {
-    applyTheme(saved);
+  function renderStory(key) {
+    const data = storyContent[key];
+    if (!data || !storyPanel) return;
+
+    storyTitle.textContent = data.title;
+    storyStatus.textContent = data.status;
+    storyStatus.style.background = data.status === "Pasted" || data.status === "Ready" ? "var(--green)" : "var(--yellow)";
+    storyStatus.style.color = data.status === "Loading Model..." ? "var(--ink)" : "#fff";
+
+    tabs.forEach((tab) => tab.classList.toggle("active", tab.dataset.tab === data.title));
+
+    storyPanel.innerHTML = storyTemplates[key] ? storyTemplates[key]() : "";
   }
 
-  themeBtn.addEventListener('click', () => {
-    const next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
-    applyTheme(next);
-  });
-
-  /* ── Custom Cursor ────────────────────────────── */
-  const cur  = document.getElementById('cur');
-  const ring = document.getElementById('cur-ring');
-  let mx = -200, my = -200;
-  let rx = -200, ry = -200;
-  let rafId;
-
-  document.addEventListener('mousemove', e => {
-    mx = e.clientX;
-    my = e.clientY;
-    cur.style.left = mx + 'px';
-    cur.style.top  = my + 'px';
-  });
-
-  function trackRing() {
-    rx += (mx - rx) * 0.095;
-    ry += (my - ry) * 0.095;
-    ring.style.left = rx + 'px';
-    ring.style.top  = ry + 'px';
-    rafId = requestAnimationFrame(trackRing);
-  }
-  trackRing();
-
-  // Hover expansion on interactive elements
-  const interactiveEls = 'a, button, summary, .step, .feat-card, .tech-tag, kbd, .btn';
-  document.querySelectorAll(interactiveEls).forEach(el => {
-    el.addEventListener('mouseenter', () => ring.classList.add('hov'));
-    el.addEventListener('mouseleave', () => ring.classList.remove('hov'));
-  });
-
-  /* ── Navbar Scroll ────────────────────────────── */
-  const nav = document.getElementById('nav');
-  const onScroll = () => nav.classList.toggle('scrolled', window.scrollY > 50);
-  window.addEventListener('scroll', onScroll, { passive: true });
-  onScroll();
-
-  /* ── Waveform Bars ────────────────────────────── */
-  const waveWrap = document.getElementById('waveWrap');
-  const BAR_COUNT = 44;
-
-  for (let i = 0; i < BAR_COUNT; i++) {
-    const bar = document.createElement('div');
-    bar.className = 'wave-bar';
-    // Organic heights — taller in the middle
-    const center = BAR_COUNT / 2;
-    const dist   = Math.abs(i - center) / center;          // 0 near center, 1 at edges
-    const base   = 8 + (1 - dist * dist) * 36;             // bell-shaped envelope
-    const jitter = (Math.random() - 0.5) * 16;             // ±8px noise
-    const h = Math.max(5, Math.round(base + jitter));
-    const d  = (0.35 + Math.random() * 0.55).toFixed(2);   // duration 0.35–0.90s
-    const dl = (Math.random() * 0.55).toFixed(2);          // delay 0–0.55s
-    bar.style.setProperty('--h',  h  + 'px');
-    bar.style.setProperty('--d',  d  + 's');
-    bar.style.setProperty('--dl', dl + 's');
-    waveWrap.appendChild(bar);
+  function activateStory(key) {
+    storySteps.forEach((step) => step.classList.toggle("is-active", step.dataset.story === key));
+    renderStory(key);
   }
 
-  /* ── Pill State Cycler ────────────────────────── */
-  const pill   = document.getElementById('pill');
-  const pDot   = document.getElementById('pDot');
-  const pLabel = document.getElementById('pLabel');
+  function setupStoryObserver() {
+    if (!storySteps.length || !("IntersectionObserver" in window)) {
+      renderStory("engine");
+      return;
+    }
 
-  const states = [
-    { label: 'Recording...',  dot: 'rec',  mod: ''     },
-    { label: 'Processing...', dot: 'proc', mod: 'proc' },
-    { label: 'Pasted',        dot: 'done', mod: 'done' },
-    { label: 'Ready',         dot: 'rec',  mod: ''     },
-  ];
-  const durations = [2600, 1800, 1400, 1600]; // ms per state
-  let si = 0;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries
+          .filter((entry) => entry.isIntersecting)
+          .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
 
-  function advancePill() {
-    si = (si + 1) % states.length;
-    const s = states[si];
-
-    pLabel.style.opacity = '0';
-    setTimeout(() => {
-      pLabel.textContent = s.label;
-      pLabel.style.opacity = '1';
-      pDot.className   = 'pill-dot ' + s.dot;
-      pill.className   = 'pill'      + (s.mod ? ' ' + s.mod : '');
-    }, 200);
-
-    setTimeout(advancePill, durations[si]);
-  }
-
-  setTimeout(advancePill, durations[0]);
-
-  /* ── Scroll Reveal ────────────────────────────── */
-  const revealEls = document.querySelectorAll('.r');
-
-  if ('IntersectionObserver' in window) {
-    const io = new IntersectionObserver((entries) => {
-      entries.forEach(entry => {
-        if (entry.isIntersecting) {
-          entry.target.classList.add('vis');
-          io.unobserve(entry.target);
+        if (visible) {
+          activateStory(visible.target.dataset.story);
         }
-      });
-    }, { threshold: 0.07, rootMargin: '0px 0px -24px 0px' });
+      },
+      { threshold: [0.35, 0.55, 0.75], rootMargin: "-12% 0px -28% 0px" }
+    );
 
-    revealEls.forEach(el => io.observe(el));
-  } else {
-    // Fallback: show everything immediately
-    revealEls.forEach(el => el.classList.add('vis'));
+    storySteps.forEach((step) => observer.observe(step));
+    renderStory("engine");
   }
 
+  function setupReveal() {
+    const revealTargets = document.querySelectorAll(".feature-card, .flow-card, .quick-panel, .section-heading");
+    revealTargets.forEach((el) => el.classList.add("reveal"));
+
+    if (!("IntersectionObserver" in window)) {
+      revealTargets.forEach((el) => el.classList.add("is-visible"));
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("is-visible");
+            observer.unobserve(entry.target);
+          }
+        });
+      },
+      { threshold: 0.12, rootMargin: "0px 0px -40px 0px" }
+    );
+
+    revealTargets.forEach((el) => observer.observe(el));
+  }
+
+  function cloneMarquee() {
+    const track = document.querySelector(".marquee-track");
+    if (!track) return;
+    track.innerHTML = track.innerHTML + track.innerHTML;
+  }
+
+  window.addEventListener("scroll", setScrolledNav, { passive: true });
+  setScrolledNav();
+  cloneMarquee();
+  setupStoryObserver();
+  setupReveal();
 })();

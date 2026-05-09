@@ -78,6 +78,7 @@ DEFAULT_SETTINGS = {
     "mic_device": "",  # empty = system default
     "auto_silence": True,
     "silence_seconds": 3.0,
+    "launch_on_startup": False,
 }
 
 LANGUAGES = {
@@ -159,7 +160,103 @@ class DataManager:
         except Exception:
             return False
 
+    def import_history(self, filepath):
+        try:
+            with open(filepath, 'r', encoding='utf-8') as f:
+                raw = f.read().strip()
+            if not raw:
+                return 0
+
+            imported = []
+            try:
+                loaded = json.loads(raw)
+                source = loaded.get("history", []) if isinstance(loaded, dict) else loaded
+                if isinstance(source, list):
+                    for item in source:
+                        if isinstance(item, dict):
+                            text = str(item.get("text", "")).strip()
+                            ts = str(item.get("time", "")).strip()
+                        else:
+                            text = str(item).strip()
+                            ts = ""
+                        if text:
+                            imported.append({"text": text, "time": ts or datetime.datetime.now().isoformat()})
+            except Exception:
+                blocks = [b.strip() for b in re.split(r"\n\s*\n", raw) if b.strip()]
+                for block in blocks:
+                    match = re.match(r"^\[([^\]]*)\]\s*(.*)$", block, re.S)
+                    if match:
+                        ts = match.group(1).strip()
+                        text = match.group(2).strip()
+                    else:
+                        ts = ""
+                        text = block
+                    if text:
+                        imported.append({"text": text, "time": ts or datetime.datetime.now().isoformat()})
+
+            if not imported:
+                return 0
+
+            existing_keys = {
+                (entry.get("time", ""), entry.get("text", ""))
+                for entry in self.data.get("history", [])
+                if isinstance(entry, dict)
+            }
+            merged = []
+            for entry in imported:
+                key = (entry.get("time", ""), entry.get("text", ""))
+                if key not in existing_keys:
+                    merged.append(entry)
+                    existing_keys.add(key)
+
+            if not merged:
+                return 0
+
+            self.data["history"] = (merged + self.data.get("history", []))[:100]
+            self.save()
+            return len(merged)
+        except Exception as e:
+            print(f"[Stype] Error importing history: {e}")
+            return 0
+
 data_manager = DataManager()
+
+STARTUP_APP_NAME = "Stype"
+STARTUP_RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
+
+def startup_command():
+    if getattr(sys, "frozen", False):
+        return f'"{sys.executable}"'
+    return f'"{sys.executable}" "{os.path.abspath(__file__)}"'
+
+def is_launch_on_startup_enabled():
+    if os.name != "nt":
+        return False
+    try:
+        import winreg
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, STARTUP_RUN_KEY, 0, winreg.KEY_READ) as key:
+            value, _ = winreg.QueryValueEx(key, STARTUP_APP_NAME)
+        return bool(value)
+    except (FileNotFoundError, OSError):
+        return False
+
+def set_launch_on_startup(enabled):
+    if os.name != "nt":
+        return False
+    try:
+        import winreg
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, STARTUP_RUN_KEY, 0, winreg.KEY_SET_VALUE) as key:
+            if enabled:
+                winreg.SetValueEx(key, STARTUP_APP_NAME, 0, winreg.REG_SZ, startup_command())
+            else:
+                try:
+                    winreg.DeleteValue(key, STARTUP_APP_NAME)
+                except FileNotFoundError:
+                    pass
+        return True
+    except OSError as e:
+        print(f"[Stype] Startup setting failed: {e}")
+        return False
 
 # ═══════════════════════════════════════════════════════════
 #  CONSTANTS
@@ -237,6 +334,19 @@ class ToggleSwitch(QCheckBox):
         p.setPen(QPen(QColor(NB_BORDER), 1.5))
         p.setBrush(QColor("#ffffff"))
         p.drawEllipse(self._pos, 2, 16, 16)
+
+
+class BrutalComboBox(QComboBox):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._arrow = QLabel("▼", self)
+        self._arrow.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._arrow.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        self._arrow.setStyleSheet(f"color: {NB_INK}; font-size: 11px; font-weight: 900; background: transparent;")
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._arrow.setGeometry(self.width() - 31, 1, 30, self.height() - 2)
 
 
 class Signals(QObject):
@@ -891,7 +1001,7 @@ class MainWindow(QMainWindow):
             QComboBox {{
                 background-color: {NB_CARD};
                 border: 2px solid {NB_BORDER};
-                padding: 7px 12px;
+                padding: 7px 38px 7px 12px;
                 color: {NB_INK};
                 font-size: 12px;
                 font-weight: 600;
@@ -909,7 +1019,7 @@ class MainWindow(QMainWindow):
                 width: 30px;
             }}
             QComboBox::down-arrow {{
-                image: url(data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMCIgaGVpZ2h0PSI2IiB2aWV3Qm94PSIwIDAgMTAgNiI+PHBhdGggZmlsbD0iIzFBMUEyRSIgZD0iTTAgMGw1IDYgNS02eiIvPjwvc3ZnPg==);
+                image: none;
                 width: 10px;
                 height: 6px;
             }}
@@ -951,6 +1061,18 @@ class MainWindow(QMainWindow):
             QPushButton#secondary_btn:hover {{
                 background-color: {NB_ORANGE};
                 color: white;
+            }}
+            QPushButton#quit_btn {{
+                background-color: {NB_PINK};
+                color: #ffffff;
+                font-weight: 900;
+                font-size: 12px;
+                border: 2px solid {NB_BORDER};
+                padding: 4px 10px;
+                min-height: 24px;
+            }}
+            QPushButton#quit_btn:hover {{
+                background-color: #D63B5C;
             }}
             QPushButton#hotkey_btn {{
                 background-color: {NB_PURPLE};
@@ -1035,13 +1157,23 @@ class MainWindow(QMainWindow):
 
         # ── Header
         header = QHBoxLayout()
+        header.setSpacing(8)
         title = QLabel("Stype Dashboard")
         title.setFont(QFont("Inter", 18, QFont.Weight.ExtraBold))
         header.addWidget(title)
+        header.addStretch()
         self.status_label = QLabel("Loading Model...")
+        self.status_label.setObjectName("status_label")
         self.status_label.setFont(QFont("Inter", 11, QFont.Weight.Bold))
         self.status_label.setStyleSheet(f"color: {NB_YELLOW}; background: {NB_INK}; padding: 4px 10px; border: 2px solid {NB_BORDER};")
-        header.addWidget(self.status_label, alignment=Qt.AlignmentFlag.AlignRight)
+        header.addWidget(self.status_label)
+        quit_btn = QPushButton("Quit")
+        quit_btn.setObjectName("quit_btn")
+        quit_btn.setFixedWidth(62)
+        quit_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        quit_btn.setToolTip("Quit Stype completely")
+        quit_btn.clicked.connect(QApplication.instance().quit)
+        header.addWidget(quit_btn)
         main_layout.addLayout(header)
 
         # ── Tabs
@@ -1066,15 +1198,28 @@ class MainWindow(QMainWindow):
             block.addWidget(widget)
             return block
 
-        self.model_combo = QComboBox()
+        self.model_combo = BrutalComboBox()
         self.model_combo.addItems(list(MODELS.keys()))
         self.model_combo.setCurrentText(data_manager.get("model") or "Balanced (Small)")
         el.addLayout(field_block("Accuracy Model", self.model_combo))
 
-        self.device_combo = QComboBox()
+        self.device_combo = BrutalComboBox()
         self.device_combo.addItems(["CPU", "GPU (NVIDIA CUDA)"])
         self.device_combo.setCurrentText(data_manager.get("device") or "CPU")
         el.addLayout(field_block("Processing Device", self.device_combo))
+
+        startup_block = QVBoxLayout()
+        startup_block.setSpacing(10)
+        startup_block.addWidget(section_label("Launch on Startup"))
+        startup_row = QHBoxLayout()
+        self.launch_startup_cb = ToggleSwitch()
+        startup_enabled = bool(data_manager.get("launch_on_startup")) or is_launch_on_startup_enabled()
+        self.launch_startup_cb.setChecked(startup_enabled)
+        startup_row.addWidget(self.launch_startup_cb)
+        startup_row.addWidget(QLabel("Start Stype when Windows signs in"))
+        startup_row.addStretch()
+        startup_block.addLayout(startup_row)
+        el.addLayout(startup_block)
 
         el.addStretch()
 
@@ -1093,7 +1238,7 @@ class MainWindow(QMainWindow):
         al.setSpacing(20)
 
         # Mic
-        self.mic_combo = QComboBox()
+        self.mic_combo = BrutalComboBox()
         self._populate_mics()
         al.addLayout(field_block("Microphone", self.mic_combo))
 
@@ -1228,18 +1373,19 @@ class MainWindow(QMainWindow):
         self.history_layout.setContentsMargins(0, 0, 6, 0)
         self.history_layout.setSpacing(8)
 
-        # Load persistent history
-        for entry in data_manager.data["history"]:
-            item = HistoryItem(entry)
-            self.history_layout.addWidget(item)
-
         self.scroll.setWidget(self.scroll_content)
         hl.addWidget(self.scroll)
-        self.history_layout.addStretch()
+        self._rebuild_history_ui()
 
         # Action buttons
         btn_row = QHBoxLayout()
         btn_row.setSpacing(8)
+        import_btn = QPushButton("Import History")
+        import_btn.setObjectName("secondary_btn")
+        import_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        import_btn.clicked.connect(self._on_import)
+        btn_row.addWidget(import_btn)
+
         export_btn = QPushButton("Export History")
         export_btn.setObjectName("secondary_btn")
         export_btn.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -1342,8 +1488,13 @@ class MainWindow(QMainWindow):
         model_name = self.model_combo.currentText()
         model_id = MODELS[model_name]
         device = "cuda" if "GPU" in self.device_combo.currentText() else "cpu"
+        launch_on_startup = self.launch_startup_cb.isChecked()
         data_manager.set("model", model_name)
         data_manager.set("device", self.device_combo.currentText())
+        data_manager.set("launch_on_startup", launch_on_startup)
+        if set_launch_on_startup(launch_on_startup):
+            self.status_label.setText("Startup Saved")
+            self.status_label.setStyleSheet(f"color: white; background: {NB_GREEN}; padding: 4px 10px; border: 2px solid {NB_BORDER};")
         self.model_changed.emit(model_id, device)
 
     def _on_save_audio(self):
@@ -1369,6 +1520,30 @@ class MainWindow(QMainWindow):
                 visible = not query or query in widget.original_text.lower()
                 widget.setVisible(visible)
 
+    def _rebuild_history_ui(self):
+        while self.history_layout.count():
+            child = self.history_layout.takeAt(0)
+            if child.widget():
+                child.widget().deleteLater()
+        for entry in data_manager.data["history"]:
+            item = HistoryItem(entry)
+            self.history_layout.addWidget(item)
+        self.history_layout.addStretch()
+
+    def _on_import(self):
+        path, _ = QFileDialog.getOpenFileName(self, "Import History", "", "Text or JSON Files (*.txt *.json);;All Files (*)")
+        if not path:
+            return
+        count = data_manager.import_history(path)
+        if count:
+            self._rebuild_history_ui()
+            self.status_label.setText(f"Imported {count}")
+            self.status_label.setStyleSheet(f"color: white; background: {NB_GREEN}; padding: 4px 10px; border: 2px solid {NB_BORDER};")
+        else:
+            self.status_label.setText("Nothing Imported")
+            self.status_label.setStyleSheet(f"color: {NB_INK}; background: {NB_YELLOW}; padding: 4px 10px; border: 2px solid {NB_BORDER};")
+        QTimer.singleShot(2000, lambda: self.update_status("ready"))
+
     def _on_export(self):
         path, _ = QFileDialog.getSaveFileName(self, "Export History", "stype_history.txt", "Text Files (*.txt)")
         if path:
@@ -1379,10 +1554,7 @@ class MainWindow(QMainWindow):
 
     def _on_clear_history(self):
         data_manager.clear_history()
-        while self.history_layout.count() > 1: # keep stretch
-            child = self.history_layout.takeAt(0)
-            if child.widget():
-                child.widget().deleteLater()
+        self._rebuild_history_ui()
 
     def _load_dictionary_ui(self):
         # Clear existing except stretch
