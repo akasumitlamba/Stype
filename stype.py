@@ -171,13 +171,27 @@ MODELS = {
     "Best (Large v3)": "large-v3",
 }
 
+# ── Neobrutalism Palette ──
+NB_BG       = "#FFFDF7"   # warm cream background
+NB_CARD     = "#FFFFFF"   # card white
+NB_INK      = "#1A1A2E"   # near-black ink
+NB_ORANGE   = "#FF6B35"   # primary accent
+NB_PURPLE   = "#7B61FF"   # secondary accent
+NB_GREEN    = "#06D6A0"   # success / listening
+NB_YELLOW   = "#FFD166"   # warning / processing
+NB_PINK     = "#EF476F"   # danger / cancel
+NB_BLUE     = "#118AB2"   # info
+NB_MUTED    = "#6C757D"   # muted text
+NB_BORDER   = "#1A1A2E"   # thick borders
+NB_SHADOW   = "#1A1A2E"   # hard shadow color
+
 STATES = {
-    "loading":    {"label": "Loading...",    "dot": "#FFA500", "border": "rgba(255,165,0,0.20)"},
-    "starting_mic": {"label": "Opening Mic...", "dot": "#6b6b72", "border": "rgba(107,107,114,0.25)"},
-    "ready":      {"label": "Ready",         "dot": "#00C853", "border": "rgba(0,200,83,0.15)"},
-    "listening":  {"label": "Listening...",  "dot": "#2DCE6E", "border": "rgba(45,206,110,0.25)"},
-    "processing": {"label": "Processing...", "dot": "#FFB420", "border": "rgba(255,180,32,0.25)"},
-    "pasted":     {"label": "Pasted",        "dot": "#2DCE6E", "border": "rgba(45,206,110,0.25)"},
+    "loading":      {"label": "Loading...",    "dot": NB_YELLOW, "border": NB_INK},
+    "starting_mic": {"label": "Opening Mic...", "dot": NB_MUTED,  "border": NB_INK},
+    "ready":        {"label": "Ready",         "dot": NB_GREEN,  "border": NB_INK},
+    "listening":    {"label": "Listening...",  "dot": NB_GREEN,  "border": NB_INK},
+    "processing":   {"label": "Processing...", "dot": NB_YELLOW, "border": NB_INK},
+    "pasted":       {"label": "Pasted",        "dot": NB_GREEN,  "border": NB_INK},
 }
 
 # ═══════════════════════════════════════════════════════════
@@ -213,13 +227,14 @@ class ToggleSwitch(QCheckBox):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
         
-        # Track
-        track_color = QColor("#ff7000") if self.isChecked() else QColor("#272729")
-        p.setPen(Qt.PenStyle.NoPen)
+        # Track — neobrutalism: solid color, thick border, subtle rounding
+        track_color = QColor(NB_ORANGE) if self.isChecked() else QColor("#E0DDD5")
+        p.setPen(QPen(QColor(NB_BORDER), 2.0))
         p.setBrush(track_color)
-        p.drawRoundedRect(0, 0, self.width(), self.height(), 10, 10)
+        p.drawRoundedRect(1, 1, self.width() - 2, self.height() - 2, 10, 10)
         
-        # Thumb
+        # Thumb — white circle with black border
+        p.setPen(QPen(QColor(NB_BORDER), 1.5))
         p.setBrush(QColor("#ffffff"))
         p.drawEllipse(self._pos, 2, 16, 16)
 
@@ -364,22 +379,27 @@ class PillOverlay(QWidget):
 
     def contextMenuEvent(self, event):
         menu = QMenu(self)
-        menu.setStyleSheet("""
-            QMenu {
-                background-color: #1a1a1e;
-                border: 1px solid #272729;
-                color: #edece8;
+        menu.setStyleSheet(f"""
+            QMenu {{
+                background-color: {NB_BG};
+                border: 2px solid {NB_BORDER};
+                color: {NB_INK};
                 padding: 4px;
-                border-radius: 6px;
-            }
-            QMenu::item {
-                padding: 6px 20px;
-                border-radius: 4px;
-            }
-            QMenu::item:selected {
-                background-color: #ff7000;
+                font-family: 'Inter', 'Segoe UI', sans-serif;
+                font-weight: 600;
+            }}
+            QMenu::item {{
+                padding: 8px 20px;
+            }}
+            QMenu::item:selected {{
+                background-color: {NB_ORANGE};
                 color: white;
-            }
+            }}
+            QMenu::separator {{
+                height: 2px;
+                background: {NB_BORDER};
+                margin: 4px 8px;
+            }}
         """)
         hide_action = QAction("Hide for 1 hour", self)
         hide_action.triggered.connect(self._hide_for_hour)
@@ -450,8 +470,10 @@ class PillOverlay(QWidget):
             self._audio_level = 0.0
 
         if state_key in ["starting_mic", "listening"]:
-            target_w = 70
-        elif state_key in ["processing", "loading", "pasted"]:
+            target_w = 84  # Increased for better gap
+        elif state_key in ["processing"]:
+            target_w = 134 # Reduced to tighten gap
+        elif state_key in ["loading", "pasted"]:
             target_w = 106
         else:
             target_w = self._ready_w
@@ -478,28 +500,46 @@ class PillOverlay(QWidget):
         state = STATES.get(self._state, STATES["ready"])
         w, h = self.width(), self.height()
 
-        path = QPainterPath()
-        path.addRoundedRect(2, 2, w - 4, h - 4, (h - 4) / 2, (h - 4) / 2)
+        # ── Neobrutalism pill: solid bg, thick border, hard shadow ──
+        shadow_offset = 3
+        radius = 6
 
-        bg_color = QColor(18, 18, 22, 230)
-        p.fillPath(path, QBrush(bg_color))
+        # Hard shadow (offset rectangle)
+        shadow_path = QPainterPath()
+        shadow_path.addRoundedRect(2 + shadow_offset, 2 + shadow_offset, w - 6, h - 6, radius, radius)
+        p.fillPath(shadow_path, QBrush(QColor(NB_BORDER)))
 
-        border_col = QColor(state["border"])
-        border_col.setAlpha(160)
-        p.setPen(QPen(border_col, 1.5))
-        p.drawPath(path)
+        # Main pill body
+        pill_path = QPainterPath()
+        pill_path.addRoundedRect(2, 2, w - 6, h - 6, radius, radius)
+        p.fillPath(pill_path, QBrush(QColor(NB_BG)))
 
-        highlight = QPen(QColor(255, 255, 255, 12), 1.0)
-        p.setPen(highlight)
-        p.drawLine(int(h / 2), 3, int(w - h / 2), 3)
+        # ── Draw RED cancel section if active ──
+        has_cancel = self._state in ["starting_mic", "listening", "processing"]
+        cancel_sec_w = 26
+        if has_cancel:
+            # Corrected right edge to w-4 to match rounded rect end
+            red_rect = QRect(w - 4 - cancel_sec_w, 2, cancel_sec_w, h - 6)
+            p.save()
+            p.setClipPath(pill_path)
+            p.fillRect(red_rect, QColor(NB_PINK))
+            # Separator line
+            p.setPen(QPen(QColor(NB_BORDER), 2.0))
+            p.drawLine(w - 4 - cancel_sec_w, 2, w - 4 - cancel_sec_w, h - 4)
+            p.restore()
+
+        # Thick border around the whole thing
+        p.setPen(QPen(QColor(NB_BORDER), 2.5))
+        p.drawPath(pill_path)
 
         if self._state == "ready":
-            p.setBrush(QBrush(QColor("#FFA500")))
-            p.setPen(Qt.PenStyle.NoPen)
-            cx, cy = w // 2, h // 2
-            p.drawEllipse(QPoint(cx - 8, cy), 2, 2)
-            p.drawEllipse(QPoint(cx, cy), 2, 2)
-            p.drawEllipse(QPoint(cx + 8, cy), 2, 2)
+            # Three bold dots in orange
+            p.setBrush(QBrush(QColor(NB_ORANGE)))
+            p.setPen(QPen(QColor(NB_BORDER), 1.0))
+            cx, cy = (w - shadow_offset) // 2, (h - shadow_offset + 4) // 2
+            p.drawEllipse(QPoint(cx - 9, cy), 3, 3)
+            p.drawEllipse(QPoint(cx, cy), 3, 3)
+            p.drawEllipse(QPoint(cx + 9, cy), 3, 3)
             p.end()
             return
 
@@ -515,63 +555,73 @@ class PillOverlay(QWidget):
                 heights = [6, 8, 12, 8, 6]
                 for i in range(bars):
                     bx = start_x + i * (bar_w + spacing)
-                    by = h // 2 - heights[i] // 2
-                    p.setBrush(QBrush(QColor("#6b6b72")))
-                    p.setPen(Qt.PenStyle.NoPen)
-                    p.drawRoundedRect(bx, by, bar_w, heights[i], 2, 2)
+                    by = (h - shadow_offset + 4) // 2 - heights[i] // 2
+                    p.setBrush(QBrush(QColor(NB_MUTED)))
+                    p.setPen(QPen(QColor(NB_BORDER), 1.0))
+                    p.drawRect(bx, by, bar_w, heights[i])
             else:
                 if not hasattr(self, '_smoothed_level'): self._smoothed_level = 0.0
                 self._smoothed_level += (self._audio_level - self._smoothed_level) * 0.35
                 
-                max_h = h - 8
+                max_h = h - 10
                 center_h = 4 + int((max_h - 4) * self._smoothed_level)
                 mid_h = 4 + int((max_h - 6) * self._smoothed_level)
                 side_h = 4 + int((max_h - 10) * self._smoothed_level)
 
                 heights = [side_h, mid_h, center_h, mid_h, side_h]
+                bar_colors = [NB_ORANGE, NB_YELLOW, NB_GREEN, NB_YELLOW, NB_ORANGE]
                 
                 for i in range(bars):
                     bar_h = max(4, heights[i])
                     bx = start_x + i * (bar_w + spacing)
-                    by = h // 2 - bar_h // 2
-                    
-                    level_color = QColor("#ff7000")
-                    p.setBrush(QBrush(level_color))
-                    p.setPen(Qt.PenStyle.NoPen)
-                    p.drawRoundedRect(bx, by, bar_w, bar_h, 2, 2)
+                    by = (h - shadow_offset + 4) // 2 - bar_h // 2
+                    p.setBrush(QBrush(QColor(bar_colors[i])))
+                    p.setPen(QPen(QColor(NB_BORDER), 1.0))
+                    p.drawRect(bx, by, bar_w, bar_h)
 
-            # Draw 'X' cancel button at the right
-            p.setPen(QPen(QColor("#6b6b72"), 1.5, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
-            cx, cy = w - 14, h // 2
-            r = 3
+            # Draw White X in the red section
+            p.setPen(QPen(Qt.GlobalColor.white, 2.0, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+            cx = (w - 4) - (cancel_sec_w // 2)
+            cy = (h - shadow_offset + 4) // 2
+            r = 4
             p.drawLine(cx - r, cy - r, cx + r, cy + r)
             p.drawLine(cx - r, cy + r, cx + r, cy - r)
         else:
-            dot_x, dot_y = 14, h // 2
+            dot_x = 16
+            dot_y = (h - shadow_offset + 4) // 2
             dot_color = QColor(state["dot"])
             if self._state == "processing" and not self._blink_on:
-                dot_color.setAlpha(100)
+                dot_color.setAlpha(80)
 
-            glow = QRadialGradient(dot_x, dot_y, 10)
-            glow_color = QColor(state["dot"])
-            glow_color.setAlpha(40)
-            glow.setColorAt(0, glow_color)
-            glow.setColorAt(1, QColor(0, 0, 0, 0))
-            p.setBrush(QBrush(glow))
-            p.setPen(Qt.PenStyle.NoPen)
-            p.drawEllipse(QPoint(dot_x, dot_y), 10, 10)
+            # Solid dot with border (no glow)
+            if self._state == "pasted":
+                # Draw boxy tick for 'pasted'
+                p.setPen(QPen(QColor(NB_GREEN), 2.5, Qt.PenStyle.SolidLine, Qt.PenCapStyle.SquareCap))
+                p.drawLine(dot_x - 4, dot_y + 1, dot_x - 1, dot_y + 4)
+                p.drawLine(dot_x - 1, dot_y + 4, dot_x + 5, dot_y - 3)
+            else:
+                p.setPen(QPen(QColor(NB_BORDER), 1.5))
+                p.setBrush(QBrush(dot_color))
+                p.drawEllipse(QPoint(dot_x, dot_y), 5, 5)
 
-            p.setBrush(QBrush(dot_color))
-            p.drawEllipse(QPoint(dot_x, dot_y), 4, 4)
-
-            # Text label
-            font = QFont("Inter", 8, QFont.Weight.Medium)
-            if not font.exactMatch(): font = QFont("Segoe UI", 8, QFont.Weight.Medium)
+            # Text label — bold and dark
+            font = QFont("Inter", 8, QFont.Weight.Bold)
+            if not font.exactMatch(): font = QFont("Segoe UI", 8, QFont.Weight.Bold)
             p.setFont(font)
-            p.setPen(QColor("#edece8"))
+            p.setPen(QColor(NB_INK))
             label = state["label"]
-            text_rect = QRect(26, 0, w - 26, h)
+            # Ensure text doesn't hit the cancel section
+            text_rect = QRect(28, 0, w - (40 if self._state == "processing" else 34), h - shadow_offset + 2)
             p.drawText(text_rect, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft, label)
+
+            if self._state == "processing":
+                # Draw White X in the red section
+                p.setPen(QPen(Qt.GlobalColor.white, 2.0, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+                cx = (w - 4) - (cancel_sec_w // 2)
+                cy = (h - shadow_offset + 4) // 2
+                r = 4
+                p.drawLine(cx - r, cy - r, cx + r, cy + r)
+                p.drawLine(cx - r, cy + r, cx + r, cy - r)
 
         p.end()
 
@@ -588,8 +638,8 @@ class PillOverlay(QWidget):
     def mouseReleaseEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton and not self._drag_moved:
             w = self.width()
-            # If clicked on X button during listening
-            if self._state in ["listening", "starting_mic"] and event.pos().x() > w - 30:
+            # If clicked on X button during active states
+            if self._state in ["listening", "starting_mic", "processing"] and event.pos().x() > w - 34:
                 self.clicked_cancel.emit()
             else:
                 self.clicked_toggle.emit()
@@ -611,50 +661,48 @@ class HistoryItem(QFrame):
             self._timestamp = ""
         self.original_text = text
         self.setObjectName("HistoryItem")
-        self.setStyleSheet("""
-            QFrame#HistoryItem {
-                background: rgba(255,255,255,0.02);
-                border: 1px solid rgba(255,255,255,0.04);
-                border-radius: 8px;
-            }
-            QFrame#HistoryItem:hover {
-                background: rgba(255,255,255,0.04);
-                border: 1px solid rgba(255,255,255,0.08);
-            }
-            QLabel {
-                color: #edece8;
+        self.setStyleSheet(f"""
+            QFrame#HistoryItem {{
+                background: {NB_CARD};
+                border: 2px solid {NB_BORDER};
+            }}
+            QFrame#HistoryItem:hover {{
+                background: #FFF8ED;
+                border: 2px solid {NB_ORANGE};
+            }}
+            QLabel {{
+                color: {NB_INK};
                 font-family: 'Inter', 'Segoe UI', sans-serif;
                 font-size: 13px;
                 background: transparent;
                 border: none;
-            }
-            QLabel#meta {
-                color: #6b6b72;
+            }}
+            QLabel#meta {{
+                color: {NB_MUTED};
                 font-size: 10px;
-            }
-            QPushButton {
-                background: transparent;
-                color: #ff7000;
-                border: 1px solid #ff7000;
-                border-radius: 4px;
-                padding: 4px 8px;
+                font-weight: 600;
+            }}
+            QPushButton {{
+                background: {NB_YELLOW};
+                color: {NB_INK};
+                border: 2px solid {NB_BORDER};
+                padding: 5px 12px;
                 font-size: 11px;
-                font-weight: bold;
-                min-width: 80px;
-            }
-            QPushButton:hover {
-                background: rgba(255, 112, 0, 0.1);
-            }
-            QTextEdit {
-                background: #151518;
-                border: 1px solid #ff7000;
-                border-radius: 6px;
+                font-weight: 800;
+                min-width: 70px;
+            }}
+            QPushButton:hover {{
+                background: {NB_ORANGE};
+                color: white;
+            }}
+            QTextEdit {{
+                background: {NB_BG};
+                border: 2px solid {NB_BORDER};
                 padding: 10px;
-                color: #edece8;
+                color: {NB_INK};
                 font-family: 'Inter', 'Segoe UI', sans-serif;
                 font-size: 13px;
-                line-height: 1.5;
-            }
+            }}
         """)
         main_layout = QHBoxLayout(self)
         main_layout.setContentsMargins(16, 12, 16, 12)
@@ -723,31 +771,30 @@ class DictEntryWidget(QFrame):
         self.entry_data = entry_data
         self.on_change = on_change
         self.setObjectName("DictEntryWidget")
-        self.setStyleSheet("""
-            QFrame#DictEntryWidget {
-                background: rgba(255,255,255,0.02);
-                border: 1px solid rgba(255,255,255,0.04);
-                border-radius: 6px;
-            }
-            QPushButton {
-                background: transparent;
-                color: #ff7000;
-                border: none;
-                font-weight: bold;
-                font-size: 16px;
-            }
-            QPushButton:hover {
-                color: #ff4422;
-            }
-            QLineEdit {
-                background: #18181b;
-                border: 1px solid transparent;
-                border-radius: 4px;
+        self.setStyleSheet(f"""
+            QFrame#DictEntryWidget {{
+                background: {NB_CARD};
+                border: 2px solid {NB_BORDER};
+            }}
+            QPushButton {{
+                background: {NB_PINK};
+                color: white;
+                border: 2px solid {NB_BORDER};
+                font-weight: 800;
+                font-size: 14px;
+            }}
+            QPushButton:hover {{
+                background: #D63B5C;
+            }}
+            QLineEdit {{
+                background: {NB_BG};
+                border: 2px solid {NB_BORDER};
                 padding: 4px 8px;
-                color: #edece8;
+                color: {NB_INK};
                 font-size: 12px;
-            }
-            QLineEdit:focus { border-color: #ff7000; }
+                font-weight: 500;
+            }}
+            QLineEdit:focus {{ border-color: {NB_ORANGE}; }}
         """)
         
         layout = QHBoxLayout(self)
@@ -757,7 +804,7 @@ class DictEntryWidget(QFrame):
         self.entry_type = entry_data.get("type", "replace") # default to replace for legacy entries
         
         type_lbl = QLabel("Vocab" if self.entry_type == "vocab" else "Replace")
-        type_lbl.setStyleSheet("color: #ff7000; font-weight: bold; font-size: 11px; min-width: 45px;")
+        type_lbl.setStyleSheet(f"color: {NB_PURPLE}; font-weight: 800; font-size: 11px; min-width: 45px;")
         layout.addWidget(type_lbl)
         
         self.target_edit = QLineEdit(entry_data.get("target", ""))
@@ -771,7 +818,7 @@ class DictEntryWidget(QFrame):
             layout.addWidget(self.target_edit, stretch=1)
             
             arrow = QLabel("→")
-            arrow.setStyleSheet("color: #6b6b72; font-weight: bold;")
+            arrow.setStyleSheet(f"color: {NB_INK}; font-weight: 900; font-size: 16px;")
             layout.addWidget(arrow)
             
             self.repl_edit = QLineEdit(entry_data.get("replacement", ""))
@@ -801,7 +848,7 @@ class PremiumBackgroundWidget(QWidget):
     def paintEvent(self, event):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
-        p.fillRect(0, 0, self.width(), self.height(), QColor("#0a0a0c"))
+        p.fillRect(0, 0, self.width(), self.height(), QColor(NB_BG))
 
 
 # ═══════════════════════════════════════════════════════════
@@ -816,173 +863,168 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("Stype Dashboard")
         self.setMinimumSize(440, 640)
 
-        self.setStyleSheet("""
-            * {
+        self.setStyleSheet(f"""
+            * {{
                 font-family: 'Inter', 'Segoe UI', sans-serif;
-            }
-            QWidget {
-                color: #edece8;
+            }}
+            QWidget {{
+                color: {NB_INK};
                 background: transparent;
-            }
-            QLabel {
-                color: #edece8;
+            }}
+            QLabel {{
+                color: {NB_INK};
                 background: transparent;
                 border: none;
-            }
-            QLabel#muted {
-                color: #6b6b72;
+            }}
+            QLabel#muted {{
+                color: {NB_MUTED};
                 font-size: 11px;
-            }
-            QLabel#section_lbl {
-                color: #6b6b72;
-                font-size: 10px;
                 font-weight: 600;
-                letter-spacing: 0.8px;
+            }}
+            QLabel#section_lbl {{
+                color: {NB_INK};
+                font-size: 10px;
+                font-weight: 800;
+                letter-spacing: 1.2px;
                 text-transform: uppercase;
-            }
-            QComboBox {
-                background-color: #18181b;
-                border: 1px solid #2a2a2e;
-                border-radius: 6px;
+            }}
+            QComboBox {{
+                background-color: {NB_CARD};
+                border: 2px solid {NB_BORDER};
                 padding: 7px 12px;
-                color: #edece8;
+                color: {NB_INK};
                 font-size: 12px;
+                font-weight: 600;
                 min-height: 28px;
-            }
-            QComboBox:hover {
-                border-color: #3a3a3e;
-            }
-            QComboBox:focus {
-                border-color: #ff7000;
-            }
-            QComboBox::drop-down { 
-                border: none; 
-                width: 30px; 
-            }
-            QComboBox::down-arrow {
-                image: url(data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMCIgaGVpZ2h0PSI2IiB2aWV3Qm94PSIwIDAgMTAgNiI+PHBhdGggZmlsbD0iIzZiNmI3MiIgZD0iTTAgMGw1IDYgNS02eiIvPjwvc3ZnPg==);
+            }}
+            QComboBox:hover {{
+                border-color: {NB_ORANGE};
+            }}
+            QComboBox:focus {{
+                border-color: {NB_ORANGE};
+            }}
+            QComboBox::drop-down {{
+                border: none;
+                border-left: 2px solid {NB_BORDER};
+                width: 30px;
+            }}
+            QComboBox::down-arrow {{
+                image: url(data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMCIgaGVpZ2h0PSI2IiB2aWV3Qm94PSIwIDAgMTAgNiI+PHBhdGggZmlsbD0iIzFBMUEyRSIgZD0iTTAgMGw1IDYgNS02eiIvPjwvc3ZnPg==);
                 width: 10px;
                 height: 6px;
-            }
-            QComboBox::down-arrow:on {
-                image: url(data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMCIgaGVpZ2h0PSI2IiB2aWV3Qm94PSIwIDAgMTAgNiI+PHBhdGggZmlsbD0iI2ZmNzAwMCIgZD0iTTAgNmw1LTYgNSA2eiIvPjwvc3ZnPg==);
-            }
-            QComboBox QAbstractItemView {
-                background-color: #18181b;
-                border: 1px solid #2a2a2e;
-                color: #edece8;
-                selection-background-color: #ff7000;
+            }}
+            QComboBox QAbstractItemView {{
+                background-color: {NB_CARD};
+                border: 2px solid {NB_BORDER};
+                color: {NB_INK};
+                selection-background-color: {NB_ORANGE};
                 outline: 0;
-            }
-            QComboBox QAbstractItemView::item {
+            }}
+            QComboBox QAbstractItemView::item {{
                 padding: 8px 12px;
                 min-height: 28px;
-            }
-            QComboBox QAbstractItemView::item:selected {
-                background-color: #ff7000;
+            }}
+            QComboBox QAbstractItemView::item:selected {{
+                background-color: {NB_ORANGE};
                 color: white;
-            }
-            QPushButton#apply_btn {
-                background-color: #ff7000;
+            }}
+            QPushButton#apply_btn {{
+                background-color: {NB_ORANGE};
                 color: #ffffff;
-                font-weight: 600;
+                font-weight: 800;
                 font-size: 13px;
-                border: none;
-                border-radius: 8px;
+                border: 3px solid {NB_BORDER};
                 padding: 11px 20px;
                 min-height: 38px;
-            }
-            QPushButton#apply_btn:hover { background-color: #ff8c00; }
-            QPushButton#apply_btn:pressed { background-color: #cc5a00; }
-            QPushButton#secondary_btn {
-                background-color: #18181b;
-                color: #a0a0a8;
-                font-weight: 500;
+            }}
+            QPushButton#apply_btn:hover {{ background-color: #E85D2A; }}
+            QPushButton#apply_btn:pressed {{ background-color: #CC4F22; }}
+            QPushButton#secondary_btn {{
+                background-color: {NB_YELLOW};
+                color: {NB_INK};
+                font-weight: 700;
                 font-size: 12px;
-                border: 1px solid #2a2a2e;
-                border-radius: 7px;
+                border: 2px solid {NB_BORDER};
                 padding: 8px 16px;
                 min-height: 32px;
-            }
-            QPushButton#secondary_btn:hover {
-                color: #edece8;
-                border-color: #3a3a3e;
-                background-color: #1f1f23;
-            }
-            QPushButton#hotkey_btn {
-                background-color: #18181b;
-                color: #edece8;
-                font-weight: 600;
-                font-size: 12px;
-                border: 1px solid #2a2a2e;
-                border-radius: 7px;
+            }}
+            QPushButton#secondary_btn:hover {{
+                background-color: {NB_ORANGE};
+                color: white;
+            }}
+            QPushButton#hotkey_btn {{
+                background-color: {NB_PURPLE};
+                color: #ffffff;
+                font-weight: 800;
+                font-size: 13px;
+                border: 2px solid {NB_BORDER};
                 padding: 8px 16px;
                 min-height: 32px;
-                letter-spacing: 0.5px;
-            }
-            QPushButton#hotkey_btn:hover {
-                border-color: #ff7000;
-                color: #ff7000;
-            }
-            QLineEdit {
-                background: #18181b;
-                border: 1px solid #2a2a2e;
-                border-radius: 6px;
+                letter-spacing: 1px;
+            }}
+            QPushButton#hotkey_btn:hover {{
+                background-color: #6A50E0;
+            }}
+            QLineEdit {{
+                background: {NB_CARD};
+                border: 2px solid {NB_BORDER};
                 padding: 7px 12px;
-                color: #edece8;
+                color: {NB_INK};
                 font-size: 12px;
+                font-weight: 500;
                 min-height: 28px;
-            }
-            QLineEdit:focus { border-color: #ff7000; }
-            QTabWidget::pane {
+            }}
+            QLineEdit:focus {{ border-color: {NB_ORANGE}; }}
+            QTabWidget::pane {{
                 border: none;
                 background: transparent;
-            }
-            QTabBar::tab {
-                background: transparent;
-                color: #6b6b72;
+            }}
+            QTabBar::tab {{
+                background: {NB_CARD};
+                color: {NB_MUTED};
                 padding: 10px 18px;
                 font-size: 12px;
-                font-weight: 500;
-                border: none;
-                border-bottom: 2px solid transparent;
+                font-weight: 700;
+                border: 2px solid {NB_BORDER};
+                border-bottom: none;
                 min-width: 70px;
-            }
-            QTabBar::tab:selected {
-                color: #edece8;
-                border-bottom: 2px solid #ff7000;
-            }
-            QTabBar::tab:hover { color: #b0b0b8; }
-            QCheckBox {
-                color: #edece8;
+                margin-right: -2px;
+            }}
+            QTabBar::tab:selected {{
+                color: {NB_INK};
+                background: {NB_ORANGE};
+                color: white;
+            }}
+            QTabBar::tab:hover {{ color: {NB_INK}; }}
+            QCheckBox {{
+                color: {NB_INK};
                 font-size: 12px;
+                font-weight: 600;
                 spacing: 9px;
-            }
-            QCheckBox::indicator {
+            }}
+            QCheckBox::indicator {{
                 width: 17px; height: 17px;
-                border-radius: 4px;
-                border: 1px solid #2a2a2e;
-                background: #18181b;
-            }
-            QCheckBox::indicator:checked {
-                background: #ff7000;
-                border-color: #ff7000;
-            }
-            QScrollArea { border: none; background: transparent; }
-            QScrollBar:vertical {
-                border: none;
-                background: rgba(255,255,255,0.02);
-                width: 5px;
-                border-radius: 2px;
-            }
-            QScrollBar::handle:vertical {
-                background: rgba(255,255,255,0.12);
-                border-radius: 2px;
+                border: 2px solid {NB_BORDER};
+                background: {NB_CARD};
+            }}
+            QCheckBox::indicator:checked {{
+                background: {NB_ORANGE};
+                border-color: {NB_BORDER};
+            }}
+            QScrollArea {{ border: none; background: transparent; }}
+            QScrollBar:vertical {{
+                border: 2px solid {NB_BORDER};
+                background: {NB_BG};
+                width: 10px;
+            }}
+            QScrollBar::handle:vertical {{
+                background: {NB_ORANGE};
+                border: 1px solid {NB_BORDER};
                 min-height: 30px;
-            }
-            QScrollBar::handle:vertical:hover { background: rgba(255,255,255,0.22); }
-            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0px; }
-            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical { background: none; }
+            }}
+            QScrollBar::handle:vertical:hover {{ background: #E85D2A; }}
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height: 0px; }}
+            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: none; }}
         """)
 
         central = PremiumBackgroundWidget()
@@ -994,11 +1036,11 @@ class MainWindow(QMainWindow):
         # ── Header
         header = QHBoxLayout()
         title = QLabel("Stype Dashboard")
-        title.setFont(QFont("Inter", 18, QFont.Weight.Bold))
+        title.setFont(QFont("Inter", 18, QFont.Weight.ExtraBold))
         header.addWidget(title)
         self.status_label = QLabel("Loading Model...")
-        self.status_label.setFont(QFont("Inter", 11, QFont.Weight.Medium))
-        self.status_label.setStyleSheet("color: #FFA500;")
+        self.status_label.setFont(QFont("Inter", 11, QFont.Weight.Bold))
+        self.status_label.setStyleSheet(f"color: {NB_YELLOW}; background: {NB_INK}; padding: 4px 10px; border: 2px solid {NB_BORDER};")
         header.addWidget(self.status_label, alignment=Qt.AlignmentFlag.AlignRight)
         main_layout.addLayout(header)
 
@@ -1088,7 +1130,7 @@ class MainWindow(QMainWindow):
         sec_row = QHBoxLayout()
         sec_row.setSpacing(10)
         sec_lbl = QLabel("Duration:")
-        sec_lbl.setStyleSheet("color: #6b6b72; font-size: 12px;")
+        sec_lbl.setStyleSheet(f"color: {NB_INK}; font-size: 12px; font-weight: 600;")
         sec_row.addWidget(sec_lbl)
         self.silence_input = QLineEdit()
         self.silence_input.setFixedWidth(64)
@@ -1097,7 +1139,7 @@ class MainWindow(QMainWindow):
         self.silence_input.setText(f"{data_manager.get('silence_seconds'):.1f}")
         sec_row.addWidget(self.silence_input)
         sec_unit_lbl = QLabel("seconds")
-        sec_unit_lbl.setStyleSheet("color: #6b6b72; font-size: 12px;")
+        sec_unit_lbl.setStyleSheet(f"color: {NB_MUTED}; font-size: 12px; font-weight: 600;")
         sec_row.addWidget(sec_unit_lbl)
         sec_row.addStretch()
         silence_block.addLayout(sec_row)
@@ -1122,7 +1164,7 @@ class MainWindow(QMainWindow):
         # Header layout
         dict_header = QHBoxLayout()
         dict_lbl = QLabel("Personal Dictionary")
-        dict_lbl.setStyleSheet("font-size: 14px; font-weight: bold;")
+        dict_lbl.setStyleSheet(f"font-size: 14px; font-weight: 800; color: {NB_INK};")
         dict_header.addWidget(dict_lbl)
         dict_header.addStretch()
 
@@ -1141,7 +1183,7 @@ class MainWindow(QMainWindow):
 
         # Helper info
         info_lbl = QLabel("Add words to improve recognition, or set replacements (e.g., 'address' → '123 Main St').")
-        info_lbl.setStyleSheet("color: #6b6b72; font-size: 11px;")
+        info_lbl.setStyleSheet(f"color: {NB_MUTED}; font-size: 11px; font-weight: 600;")
         info_lbl.setWordWrap(True)
         dl.addWidget(info_lbl)
 
@@ -1332,7 +1374,7 @@ class MainWindow(QMainWindow):
         if path:
             if data_manager.export_history(path):
                 self.status_label.setText("Exported!")
-                self.status_label.setStyleSheet("color: #2DCE6E;")
+                self.status_label.setStyleSheet(f"color: white; background: {NB_GREEN}; padding: 4px 10px; border: 2px solid {NB_BORDER};")
                 QTimer.singleShot(2000, lambda: self.update_status("ready"))
 
     def _on_clear_history(self):
@@ -1376,7 +1418,8 @@ class MainWindow(QMainWindow):
         if not state_key in STATES: return
         state = STATES[state_key]
         self.status_label.setText(state["label"])
-        self.status_label.setStyleSheet(f"color: {state['dot']};")
+        dot = state['dot']
+        self.status_label.setStyleSheet(f"color: white; background: {dot}; padding: 4px 10px; border: 2px solid {NB_BORDER};")
 
     def closeEvent(self, event):
         """Override close to just hide the window, keeping it out of the taskbar."""
@@ -1393,6 +1436,7 @@ class StypeEngine:
         self.model = None
         self.recording = False
         self.processing = False
+        self.cancelled = False
         self.audio_frames = []
         self._silence_frames = 0  # count of consecutive silent frames
         self._current_hotkey = None
@@ -1541,6 +1585,7 @@ class StypeEngine:
             self.recording = False
             self._stop_audio_stream()
             self.processing = True
+            self.cancelled = False
             self.signals.state_changed.emit("processing")
             threading.Thread(target=self._process, daemon=True).start()
 
@@ -1548,6 +1593,12 @@ class StypeEngine:
         if self.recording:
             self.recording = False
             self._stop_audio_stream()
+            self.audio_frames = []
+            self.signals.state_changed.emit("ready")
+            self.tray_icon.setToolTip("Stype — Ready")
+        elif self.processing:
+            self.cancelled = True
+            self.processing = False
             self.audio_frames = []
             self.signals.state_changed.emit("ready")
             self.tray_icon.setToolTip("Stype — Ready")
@@ -1571,6 +1622,7 @@ class StypeEngine:
             self.recording = False
             self._stop_audio_stream()
             self.processing = True
+            self.cancelled = False
             self.signals.state_changed.emit("processing")
             self.tray_icon.setToolTip("Stype — Processing...")
             threading.Thread(target=self._process, daemon=True).start()
@@ -1594,7 +1646,7 @@ class StypeEngine:
                 device=device,
                 compute_type=compute_type,
                 cpu_threads=os.cpu_count() or 4,
-                num_workers=2,
+                num_workers=1,
                 download_root=os.path.join(DATA_DIR, "whisper_model")
             )
             self.signals.state_changed.emit("ready")
@@ -1632,14 +1684,20 @@ class StypeEngine:
             if vocab:
                 prompt += " Vocabulary: " + ", ".join(list(set(vocab))[:50])
             transcribe_kwargs = dict(
-                beam_size=5,
-                vad_filter=False,
+                beam_size=1,            # 1 is much faster (greedy search), 5 is for high accuracy
+                vad_filter=True,        # Enable VAD filter to ignore silence
+                vad_parameters=dict(min_silence_duration_ms=500), # Aggressive VAD
                 condition_on_previous_text=False,
                 initial_prompt=prompt,
                 language="en"
             )
 
             segments, _ = self.model.transcribe(audio_data, **transcribe_kwargs)
+            
+            # Check if user cancelled while we were working
+            if self.cancelled:
+                return
+
             raw_text = "".join([s.text for s in segments]).strip()
 
             if raw_text:

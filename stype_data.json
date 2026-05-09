@@ -1,7 +1,7 @@
 {
     "settings": {
-        "hotkey": "shift+backspace",
-        "model": "Best (Large v3)",
+        "hotkey": "ctrl+space",
+        "model": "Balanced (Small)",
         "device": "CPU",
         "language": "English",
         "mic_device": "System Default",
@@ -9,10 +9,6 @@
         "silence_seconds": 3.0
     },
     "personal_dict": [
-        {
-            "target": "address",
-            "replacement": "121 hanuman colony"
-        },
         {
             "target": "out words",
             "replacement": "outwards"
@@ -28,277 +24,64 @@
     ],
     "history": [
         {
-            "text": "Yeah, genius, it's fucking working.",
-            "time": "2026-05-09T01:22:55.210801"
+            "text": "Read the new features, designs, layout changes, new dashboard, what it includes, and everything. Keep the placeholders for the images and tell me where to add which images. You can go multiple apps in the lab or whatever. You can also put a scrolling stop animations. I won't reach animations in the UI. Like if I scroll something stays on the left side but scrolls on the right side with the text But the image stays and all those kind of things if needed incorporate them all I'm counting on you make no mistakes.",
+            "time": "2026-05-09T19:50:13.996348"
         },
         {
-            "text": "Well, I tried to change the shortcut key from the hotkey settings, but it didn't even listen to any single shortcut that I pressed. Not even a single one, what the fuck. And also the control space was also not working after that.",
-            "time": "2026-05-09T01:17:40.833468"
+            "text": "Read the design language of the actual app in this project. And then according to that, redesign the website completely. Also write what the new features are in there and etc. Do a complete overhaul as this is the new version which is different than the last one which has some other kind of design. So yeah, incorporate this new design into the website and make website should be static only because I am hosting it on GitHub pages.",
+            "time": "2026-05-09T19:49:15.984096"
         },
         {
-            "text": "jagdish akash arjana pael.",
-            "time": "2026-05-09T01:14:35.925455"
+            "text": "Okay, yes, correct.",
+            "time": "2026-05-09T19:48:24.539279"
         },
         {
-            "text": "Why am I not allowed to add just a single word without replacement, like my name, so that it doesn't get mispronounced or mistyped, like Sumit?",
-            "time": "2026-05-09T01:14:21.840115"
+            "text": "Just one thing, can you make the tick of that pasted more uniboxy type? It is the curved tick. I want it to be a proper boxy tick to fit the theme.",
+            "time": "2026-05-09T19:46:02.685171"
         },
         {
-            "text": "I want to 121 hanuman colony this concern.",
-            "time": "2026-05-09T01:13:22.132210"
+            "text": "Rest everything is looking fine.",
+            "time": "2026-05-09T19:45:39.912607"
         },
         {
-            "text": "Let me see if this fucking thing has even fucked something yet. ok so i am saying 121 hanuman colony now.",
-            "time": "2026-05-09T01:13:09.278191"
+            "text": "Ola ami wo s, I see some white leakage on the left part of this. I don't think this is supposed to be happening.",
+            "time": "2026-05-09T19:45:14.203254"
         },
         {
-            "text": "Introduce personal dictionary in the settings where user can keep their own words either direct words like name or anyplace name or whatever they want to keep or the replacement words so that they can you know keep the things like if I say address then replace it with this so they can type in this like the whole address and it can be replaced design the UI product to the best possible way we can do this and implement it.",
-            "time": "2026-05-09T01:08:25.180332"
+            "text": "Hello hello hello hello hello hello-.",
+            "time": "2026-05-09T19:42:52.977193"
         },
         {
-            "text": "Remove the whole fix and learn idea from this project. I think the model is good enough to understand the proper words.",
-            "time": "2026-05-09T01:03:04.646489"
+            "text": "It looks empty. There's something hiding. In 1970, a group of Soviet scientists started drilling right here. For 28 years, they kept going and going until, after nearly 4000 meters, they suddenly stopped. Because they had found something unimaginable. Liquid water. a secret lake down below all this ice that had been completely sealed off from the rest of the world for 15 million years. How? And is there something alive in there? Creatures that have been evolving separately from the rest of the planet for 15 million years. So scientists started searching for more of these secret lakes. and as.",
+            "time": "2026-05-09T19:39:54.380095"
         },
         {
-            "text": "Still, there is no proper drop-down arrow for the drop-down stuff. Can you just use a.",
-            "time": "2026-05-09T01:01:47.857929"
+            "text": "Okay, how it will process. I want to see if I speak a very long length of text and hopefully this works fine. But I don't know what else to say. Human resource executive at Reliance Technology reached to blah blah blah apply pending at humatra hr solution system integration and test engineer.",
+            "time": "2026-05-09T19:38:26.609019"
         },
         {
-            "text": "Still lot of space wasted.",
-            "time": "2026-05-09T01:01:21.157395"
+            "text": "This is the test 2. 1 2 1 2, test 2, test 2.",
+            "time": "2026-05-09T19:37:52.390270"
         },
         {
-            "text": "Change the theme of the app's dashboard from red and black to black and orange. Find the perfect shade of orange to match this.",
-            "time": "2026-05-09T00:59:24.142478"
+            "text": "Is it working? 1, 2, 3, 4, 5, 6. Is it working?",
+            "time": "2026-05-09T19:35:49.717463"
         },
         {
-            "text": "Also, the drop-down arrows are not proper.",
-            "time": "2026-05-09T00:58:37.529328"
+            "text": "new google health app which is basically a rebranded version of the fitbit app and while the free tier handles the basics like activities sleep and step tracking the advanced gemini powered ai features require a ten dollar per month subscription that unlocks features like photo based meal logging adaptive fitness plans detailed sleep insights and an ai coach the band drops on may 26 with three months of subscription completely free though if you're already a google ai pro or ultra subscriber the subscription gets included by default overall it's interesting to see google competing in the same space as now are you getting one.",
+            "time": "2026-05-09T19:23:06.554930"
         },
         {
-            "text": "Fix this UI inconsistency in the history panel.",
-            "time": "2026-05-09T00:58:25.905994"
+            "text": "Every single day.",
+            "time": "2026-05-09T19:21:14.277829"
         },
         {
-            "text": "Checking if this thing is still working or not.",
-            "time": "2026-05-09T00:55:49.496144"
+            "text": "The transcription is taking hell lot of time. So, that is not good. And also, I want few more themes to be incorporated in this. Because some people may not like the new Brutalism theme. So, yeah, please put some more themes in there. And in the settings, let the people choose. keep the old one as well which you removed so yeah people would like that too keep this one and like two three more.",
+            "time": "2026-05-09T19:04:36.148609"
         },
         {
-            "text": "One last thing to do, when the app is launched, just show the pill, and hide the dashboard, and also do not keep it in the taskbar too, just keep it in the system tray. I should be able to right click on the pill, and open the dashboard by clicking on the settings there, add a setting option on the right click menu, and I can also open it via the system tray. So when I do that I open it from there then it should be visible in the taskbar otherwise not.",
-            "time": "2026-05-09T00:53:55.557779"
-        },
-        {
-            "text": "Testing the Hiddelpin's hidden pill design-.",
-            "time": "2026-05-09T00:52:54.904396"
-        },
-        {
-            "text": "Hola, hola, hola, hola, hola, hola.",
-            "time": "2026-05-09T00:52:38.767487"
-        },
-        {
-            "text": "And the text is pasted.",
-            "time": "2026-05-09T00:51:34.476191"
-        },
-        {
-            "text": "So, when it is hidden for 1 hour, it is hidden from the screen, but whenever I toggle it by shortcut, the bill should be visible anyways. and then automatically hide once I am finished.",
-            "time": "2026-05-09T00:51:27.013855"
-        },
-        {
-            "text": "It will be more like rewrite of this thing rather than just transcribing and speech to text.",
-            "time": "2026-05-09T00:49:55.962484"
-        },
-        {
-            "text": "So this is a question, do not execute any, you know, do not edit any code for this. I want to ask, can I give a corporate mode in which whatever user say in any kind of language, let's say rude, abruptive, not proper, or anything, it converts into a professional corporate tone which is polite but also convey his message correctly.",
-            "time": "2026-05-09T00:49:42.196895"
-        },
-        {
-            "text": "and here it actually did.",
-            "time": "2026-05-09T00:48:57.425655"
-        },
-        {
-            "text": "See, in this thing, it should have replaced it by 1,2,3,4 numeric rather than alphabetic.",
-            "time": "2026-05-09T00:48:47.014587"
-        },
-        {
-            "text": "Testing, testing, one, two, three, four, mic, testing.",
-            "time": "2026-05-09T00:48:22.796224"
-        },
-        {
-            "text": "Lastly, I want a feature that if I right-click on the pill itself, it should give me an option to quit the app or hide the pill. And hide pill for one hour only. So make it clear like hide pill for one hour or hide for one hour. Whatever, you can select the wordings for both, but I want these options.",
-            "time": "2026-05-09T00:36:10.563068"
-        },
-        {
-            "text": "You did all the changes but left the bugs which were you were supposed to primarily fix. For example, in audio, the checkbox for auto stop on silence is just a checkbox and doesn't have a tick. Instead made it make it in a toggle instead. Now the duration 3 second box is way larger in height than the row it is in so that is not cool other than that the microphone system sound doesn't have a proper drop down arrow icon in history if i click fix and learn the whole thing gets totally offset the edit box is somewhere save is somewhere cancel it somewhere and there is a huge blank space and what not like what the hell man and even in the engine the drop-down arrows are not visible what the actual fuck is going on here.",
-            "time": "2026-05-09T00:35:12.029645"
-        },
-        {
-            "text": "Fix the UI inconsistencies of the dashboard. Make no mistakes.",
-            "time": "2026-05-09T00:19:31.694640"
-        },
-        {
-            "text": "Introduce the light mode in the settings UI. I mean the dashboard. Introduce light mode there. to not make the light mode changes to the pill.vv.",
-            "time": "2026-05-09T00:16:52.285763"
-        },
-        {
-            "text": "to, symmetric, outwards, inwards, lo, that, transcription, inwards, lo, he.",
-            "time": "2026-05-09T00:12:42.774185"
-        },
-        {
-            "text": "saying after cancelling,.",
-            "time": "2026-05-09T00:06:12.408492"
-        },
-        {
-            "text": "Additionally, the global key listener is not listening. And you know, when it is listening, it should not trigger the actual application pill.vv or mode to listening mode or whatever. The auto stop after silence check mark is not actually checked in the settings and also instead of the slider I want it to be a number field with seconds after that. redesigned that UI.",
-            "time": "2026-05-09T00:05:22.086341"
-        },
-        {
-            "text": "What the he is this UI?",
-            "time": "2026-05-09T00:03:17.982738"
-        },
-        {
-            "text": "This thing is still replacing my that with whatever I am saying forward. Like, it is putting that everywhere even though it is not supposed to. What the hell?",
-            "time": "2026-05-09T00:02:06.131208"
-        },
-        {
-            "text": "Reading a whole lines of things so that.vv it can recognize my voice correctly. Even though if I am not speaking clearly, I want to suggest that.vv I have just sent multiple messages to here and there.",
-            "time": "2026-05-09T00:01:34.100906"
-        },
-        {
-            "text": "Yo, yo, bitch, what's up, motherfuckers?",
-            "time": "2026-05-08T23:57:09.995705"
-        },
-        {
-            "text": "Okay, which show this has to work finally, without any problems?",
-            "time": "2026-05-08T23:56:56.527361"
-        },
-        {
-            "text": "Are expanding very few pixels when I speak, so can you make them react more even if my voice is low?",
-            "time": "2026-05-08T23:46:38.105016"
-        },
-        {
-            "text": "Pulsing dots which are reacting to my sound.",
-            "time": "2026-05-08T23:46:16.068561"
-        },
-        {
-            "text": "It is not listening to my whole thing. It is just pasting random lines which I spoke in between not the whole lines. This is a pretty major issue has to be fixed.",
-            "time": "2026-05-08T23:45:31.834556"
-        },
-        {
-            "text": "The pulsing dots are converted into orange dots at some point.",
-            "time": "2026-05-08T23:45:07.593675"
-        },
-        {
-            "text": "It is working. Hopefully.",
-            "time": "2026-05-08T23:44:32.712063"
-        },
-        {
-            "text": "Ok, final test. Hopefully this thing works. Or not. I don't care. But it should work.",
-            "time": "2026-05-08T23:04:27.899125"
-        },
-        {
-            "text": "Why the hell is there so much gap in between these things? Like between the dot and the x, and then there is so much gap in the processing state, pasted state. Why is it so much gap left in the pill.",
-            "time": "2026-05-08T23:02:42.828885"
-        },
-        {
-            "text": "Is it working?",
-            "time": "2026-05-08T23:02:12.650326"
-        },
-        {
-            "text": "Next thing I want is that.vv it is always keeping access of the mic that.vv will spark privacy concerns. I don't want that.vv. So, keep the pill in there with orange dots when ready. When user clicks on it or clicks the shortcut key, expand the pill but show gray dots in place of orange dots. show grey dots that.vv yeah it is open but it is loading in case we want features or anything is loading and when it is ready to record turn the equalizer or the visualizer thing to green to indicate that.vv it is now working.",
-            "time": "2026-05-08T23:01:26.597456"
-        },
-        {
-            "text": "Again, the next thing is to say in the app itself, in the history section, when I edit, or like click on fix and learn, instead of multi-line editing, it is making the whole transcript in the single line, and then I have to go left and right to fix that.vv. All these things are not good you have to actually fix all of these things in this version like in this fix itself I won't ask you one more time.",
-            "time": "2026-05-08T22:57:30.966219"
-        },
-        {
-            "text": "It also took my control V and everything, the shortcut I made, it learned that.vv too. This is not how it should work. You have to actually fix the learning part of this.",
-            "time": "2026-05-08T22:56:45.120462"
-        },
-        {
-            "text": "The reaction of the dots is good, but it is not smooth enough. It is like jumping too much. you the screenshot of that.",
-            "time": "2026-05-08T22:56:09.379651"
-        },
-        {
-            "text": "make the overall height of the pill bit less too because width is correct but the vertical height is I think a bit too much. So, reduce it to 70% of the current then it will be fine.",
-            "time": "2026-05-08T22:53:42.173938"
-        },
-        {
-            "text": "the end. Next thing is I want the pill to be placed a bit lower, like currently it is at some position, I want the height to be 30% of its current height from the taskbar. It it is just too high for me to process.",
-            "time": "2026-05-08T22:53:10.905425"
-        },
-        {
-            "text": "It is learning the wrong words like after typing if I after typing the last sentence after symmetric if I clicked the enter it just learned symmetric. What the hell?",
-            "time": "2026-05-08T22:52:35.792519"
-        },
-        {
-            "text": "There is one thing, I don't want it to be, you know, first of all, these equalizer dots are barely reacting, and also they are not symmetric.",
-            "time": "2026-05-08T22:51:55.225107"
-        },
-        {
-            "text": "So the pill is actually kind of big. Make it a bit smaller. And also when it is in ready state, just you know make the pill very much smaller and keep it visible in the bottom section at the center. Just a bit above the taskbar so that user know that this thing is there and they don't forget to use it just keep it just as a plain box kind of with some dots in it orange dots i would prefer and also now that it is visible when user clicks on it it automatically starts rather than waiting for the shortcut key to be pressed.",
-            "time": "2026-05-08T22:44:52.016094"
-        },
-        {
-            "text": "The last thing being, first of all, there is a space automatically added to the starting of every sentence. So, that should be removed because like, I don't want a space whenever something gets pasted. Okay, anyways, the next thing I want is like, the processing part is a bit slow. Can you use hyperthreading, multithreading, or whatever kind of, you know, whatever you can think of to get this processing part done faster.",
-            "time": "2026-05-08T22:43:48.577186"
-        },
-        {
-            "text": "Third thing, I don't like this bar going right and left when I speak with my volume. I mean, I want some kind of reactiveness to my volume response but this is not the way to go. Can you make it dotted kind of instead of the whole bar just like 5-6 dots which you know expand vertically when I speak and then collapse when I don't that kind of thing.",
-            "time": "2026-05-08T22:43:05.840804"
-        },
-        {
-            "text": "The second thing is I don't have any option to cancel once I have started speaking. So instead give me an X option on the pill using which I can cancel the transcription eventually without it pasting it.",
-            "time": "2026-05-08T22:42:24.669634"
-        },
-        {
-            "text": "I don't think it is quite picking up what I am trying to, you know, edit in this because I think there is some kind of confusion there because when I edit, it should supposed to, you know, pick the words and keep them in the history. Whatever I edit after this has pasted but it is not doing that. So, I don't know if this is a gap in the flow or what. But still it is I guess you know try to fix it if there is some issue.",
-            "time": "2026-05-08T22:41:44.869273"
-        },
-        {
-            "text": "Okay, let's see how it does this time and I hope it works as fine as such. It is supposed to be unconditionally and I will be giving some transcription.",
-            "time": "2026-05-08T22:40:32.058487"
-        },
-        {
-            "text": "When I spoke in Hindi, it typed in English and that to anything else.",
-            "time": "2026-05-08T19:16:05.873079"
-        },
-        {
-            "text": "When the speaker lists items, they are formatted as a bullet list.",
-            "time": "2026-05-08T19:11:48.679587"
-        },
-        {
-            "text": "Apply and reload engine button and save audio settings does not have any background which makes it differently identified that user have to save it. It looks more like a background text. So give the button a proper makeover so that user is able to identify and place them at the bottom instead of just there.",
-            "time": "2026-05-08T19:06:33.501209"
-        },
-        {
-            "text": "Second thing tell me that how the fix and learn will work. Because I have no idea how to test it.",
-            "time": "2026-05-08T19:05:48.909971"
-        },
-        {
-            "text": "Let the system listen to the active odd case when changing and then put it in there rather than letting the user type it in.",
-            "time": "2026-05-08T19:05:05.784174"
-        },
-        {
-            "text": "In the floating pill, if it is listening and showing animation, I don't want to see text in that place. So, keep it as listening UI only or just the text, not both as it looks ugly overall.",
-            "time": "2026-05-08T19:01:47.002355"
-        },
-        {
-            "text": "Maximize button does not work. It is still keeping the same size.",
-            "time": "2026-05-08T19:01:23.302320"
-        },
-        {
-            "text": "All dropdowns are transparent, so it is like making no sense, I cannot see anything.",
-            "time": "2026-05-08T19:01:09.089376"
-        },
-        {
-            "text": "and inwards, inwards, inwards.",
-            "time": "2026-05-08T19:00:32.323362"
-        },
-        {
-            "text": "It can be deleted or deleted or deleted a new delivery code.",
-            "time": "2026-05-08T18:59:59.822327"
-        },
-        "Here is the recording link for reference."
+            "text": "Design the website using this similar language as well and also redesign the pill so that it looks a bit more clean because currently I think it is all right but there is some gap in what I see so yeah consider that as well but yeah design the website as and do that do this after that.",
+            "time": "2026-05-09T19:02:59.327836"
+        }
     ]
 }
