@@ -25,6 +25,10 @@
     ],
     "history": [
         {
+            "text": "Keep the index file in root folder as well and adjust other with respect to it.",
+            "time": "2026-05-09T20:38:57.773530"
+        },
+        {
             "text": "After moving the index.html file inside the folder, the github page is no longer picking it up. Fix the issue.",
             "time": "2026-05-09T20:34:51.959953"
         },
