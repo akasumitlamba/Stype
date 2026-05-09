@@ -65,7 +65,7 @@ If you want to run Stype from source:
 
 3. **Run the App:**
    ```bash
-   python ispeak_gui.py
+   python stype.py
    ```
 
 ---

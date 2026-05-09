@@ -2,10 +2,10 @@
 
 
 a = Analysis(
-    ['ispeak.py'],
+    ['stype.py'],
     pathex=[],
     binaries=[],
-    datas=[('whisper_model', 'whisper_model')],
+    datas=[('whisper_model', 'whisper_model'), ('assets', 'assets')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
@@ -21,7 +21,7 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name='ispeak',
+    name='Stype',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -32,7 +32,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=['C:\\Users\\sumit\\OneDrive\\Desktop\\Random\\iSpeak\\icon.ico'],
+    icon=['assets/icon.ico'],
     contents_directory='.',
 )
 coll = COLLECT(
@@ -42,5 +42,5 @@ coll = COLLECT(
     strip=False,
     upx=True,
     upx_exclude=[],
-    name='ispeak',
+    name='Stype',
 )

@@ -1423,7 +1423,7 @@ class StypeEngine:
 
         # Tray icon
         qapp = QApplication.instance()
-        icon_path = os.path.join(DATA_DIR, "icon.ico")
+        icon_path = os.path.join(DATA_DIR, "assets", "icon.ico")
         icon_path = icon_path if os.path.exists(icon_path) else ""
         self.tray_icon = QSystemTrayIcon(QIcon(icon_path), qapp)
         self.tray_icon.setToolTip("Stype Dictation Engine")

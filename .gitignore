@@ -31,3 +31,6 @@ whisper_model/
 # OS
 .DS_Store
 Thumbs.db
+
+# App Data
+stype_data.json
