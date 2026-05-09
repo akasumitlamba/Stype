@@ -25,6 +25,10 @@
     ],
     "history": [
         {
+            "text": "After moving the index.html file inside the folder, the github page is no longer picking it up. Fix the issue.",
+            "time": "2026-05-09T20:34:51.959953"
+        },
+        {
             "text": "The icon should not be too much cluttered. It has to be a simple and clean. Do not mess this up.",
             "time": "2026-05-09T20:32:20.673678"
         },
