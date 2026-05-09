@@ -1,12 +1,14 @@
 [Setup]
 AppName=Stype
-AppVersion=1.0
-DefaultDirName={pf}\Stype
+AppVersion=2.0
+AppPublisher=Sumit Lamba
+DefaultDirName={autopf}\Stype
 DefaultGroupName=Stype
 UninstallDisplayIcon={app}\Stype.exe
 Compression=lzma2
 SolidCompression=yes
 OutputDir=..\dist
+OutputBaseFilename=StypeSetup
 ; This points to your icon file for the installer itself
 SetupIconFile="..\assets\icon.ico"
 

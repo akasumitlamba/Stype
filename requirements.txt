@@ -1,6 +1,7 @@
 PyQt6
 numpy
 sounddevice
+soundcard
 keyboard
 pyperclip
 faster-whisper

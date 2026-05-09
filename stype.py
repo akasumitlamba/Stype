@@ -13,7 +13,6 @@ os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
 os.environ["HF_HUB_DISABLE_TELEMETRY"] = "1"
 
 import datetime
-import difflib
 import threading
 import numpy as np
 import sounddevice as sd
@@ -41,7 +40,7 @@ from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QComboBox, QPushButton, QFrame, QScrollArea,
     QSystemTrayIcon, QMenu, QLineEdit, QFileDialog,
-    QCheckBox, QTabWidget, QTextEdit
+    QTabWidget, QTextEdit, QAbstractButton
 )
 from PyQt6.QtCore import (
     Qt, pyqtSignal, pyqtProperty, QObject, QTimer, QPropertyAnimation,
@@ -329,51 +328,40 @@ def find_input_device_index(display_name):
             return device_idx
     return None
 
-def _wasapi_hostapi_index(hostapis):
-    for i, hostapi in enumerate(hostapis):
-        if "wasapi" in str(hostapi.get("name", "")).lower():
-            return i
-    return None
+class SystemAudioStream:
+    def __init__(self, callback, samplerate=16000):
+        self.callback = callback
+        self.samplerate = samplerate
+        self.running = False
+        self.thread = None
 
-def find_system_output_device():
-    """Return the default WASAPI output device for loopback capture."""
-    try:
-        devices = sd.query_devices()
-        hostapis = sd.query_hostapis()
-    except Exception:
-        return None, None
+    def start(self):
+        self.running = True
+        self.thread = threading.Thread(target=self._run, daemon=True)
+        self.thread.start()
 
-    wasapi_idx = _wasapi_hostapi_index(hostapis)
-    if wasapi_idx is None:
-        return None, None
+    def _run(self):
+        import soundcard as sc
+        try:
+            mics = sc.all_microphones(include_loopback=True)
+            if not mics: return
+            default_spk = sc.default_speaker()
+            loopback_mic = next((m for m in mics if m.id == default_spk.id), mics[0])
+            with loopback_mic.recorder(samplerate=self.samplerate, channels=1) as mic:
+                while self.running:
+                    data = mic.record(numframes=1024)
+                    if data is not None and len(data) > 0:
+                        self.callback(data, len(data), None, None)
+        except Exception as e:
+            print(f"[Stype] System audio error: {e}")
 
-    default_output = hostapis[wasapi_idx].get("default_output_device", -1)
-    if default_output is not None and int(default_output) >= 0:
-        device = devices[int(default_output)]
-        if int(device.get("max_output_channels", 0)) > 0:
-            return int(default_output), device
+    def stop(self):
+        self.running = False
+        if self.thread:
+            self.thread.join(timeout=1.0)
 
-    try:
-        default_pair = sd.default.device
-        default_device = default_pair[1] if isinstance(default_pair, (list, tuple)) else None
-        if default_device is not None and int(default_device) >= 0:
-            device = devices[int(default_device)]
-            if device.get("hostapi") == wasapi_idx and int(device.get("max_output_channels", 0)) > 0:
-                return int(default_device), device
-    except Exception:
-        pass
-
-    for i, device in enumerate(devices):
-        if device.get("hostapi") == wasapi_idx and int(device.get("max_output_channels", 0)) > 0:
-            return i, device
-
-    return None, None
-
-def make_wasapi_loopback_settings():
-    try:
-        return sd.WasapiSettings(loopback=True)
-    except (AttributeError, TypeError):
-        return None
+    def close(self):
+        self.stop()
 
 def resample_audio(audio_data, source_rate, target_rate=16000):
     source_rate = int(source_rate or target_rate)
@@ -426,14 +414,22 @@ STATES = {
 # ═══════════════════════════════════════════════════════════
 #  TOGGLE SWITCH WIDGET
 # ═══════════════════════════════════════════════════════════
-class ToggleSwitch(QCheckBox):
+class ToggleSwitch(QAbstractButton):
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.setCheckable(True)
         self.setFixedSize(38, 20)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self._pos = 2
         self._anim = QPropertyAnimation(self, b"pos")
         self._anim.setDuration(120)
+        self._anim.setEasingCurve(QEasingCurve.Type.InOutQuad)
+        self.toggled.connect(self._animate_state)
+
+    def _animate_state(self, checked):
+        self._anim.stop()
+        self._anim.setEndValue(20 if checked else 2)
+        self._anim.start()
 
     @pyqtProperty(int)
     def pos(self): return self._pos
@@ -443,14 +439,10 @@ class ToggleSwitch(QCheckBox):
         self.update()
 
     def setChecked(self, checked):
+        if self.isChecked() == checked:
+            return
         super().setChecked(checked)
-        self._anim.setEndValue(20 if checked else 2)
-        self._anim.start()
-
-    def nextCheckState(self):
-        super().nextCheckState()
-        self._anim.setEndValue(20 if self.isChecked() else 2)
-        self._anim.start()
+        # toggled signal will automatically fire and call _animate_state
 
     def paintEvent(self, event):
         p = QPainter(self)
@@ -466,6 +458,7 @@ class ToggleSwitch(QCheckBox):
         p.setPen(QPen(QColor(NB_BORDER), 1.5))
         p.setBrush(QColor("#ffffff"))
         p.drawEllipse(self._pos, 2, 16, 16)
+        p.end()
 
 
 class BrutalComboBox(QComboBox):
@@ -692,10 +685,12 @@ class PillOverlay(QWidget):
         self.update()
 
     def _system_button_w(self):
-        return 26 if self._system_audio_enabled else 0
+        if self._system_audio_enabled and self._state in ["starting_mic", "starting_system", "listening"]:
+            return 26
+        return 0
 
     def _system_audio_open(self):
-        return self._capture_source == "system" and self._state in ["starting_system", "listening"]
+        return self._capture_source == "system_active" and self._state in ["starting_system", "listening"]
 
     def set_state(self, state_key: str):
         self._state = state_key
@@ -778,31 +773,44 @@ class PillOverlay(QWidget):
         if icon_w:
             icon_rect = QRect(2, 2, icon_w, h - 6)
             icon_open = self._system_audio_open()
+            bg_color = NB_PURPLE if icon_open else NB_YELLOW
+            icon_color = "#FFFFFF" if icon_open else NB_INK
+
             p.save()
             p.setClipPath(pill_path)
-            p.fillRect(icon_rect, QColor(NB_BLUE if icon_open else "#E0DDD5"))
+            p.fillRect(icon_rect, QColor(bg_color))
             p.setPen(QPen(QColor(NB_BORDER), 2.0))
             p.drawLine(2 + icon_w, 2, 2 + icon_w, h - 4)
             p.restore()
 
-            p.setPen(QPen(QColor("#FFFFFF" if icon_open else NB_INK), 1.8, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
-            p.setBrush(QBrush(QColor("#FFFFFF" if icon_open else NB_INK)))
+            # Geometric boxy speaker
+            p.setPen(QPen(QColor(NB_BORDER), 1.5, Qt.PenStyle.SolidLine, Qt.PenCapStyle.SquareCap, Qt.PenJoinStyle.MiterJoin))
+            p.setBrush(QColor(icon_color))
+            
             cy = (h - shadow_offset + 4) // 2
-            sx = 8
-            speaker = QPainterPath()
-            speaker.moveTo(sx, cy - 4)
-            speaker.lineTo(sx + 4, cy - 4)
-            speaker.lineTo(sx + 9, cy - 8)
-            speaker.lineTo(sx + 9, cy + 8)
-            speaker.lineTo(sx + 4, cy + 4)
-            speaker.lineTo(sx, cy + 4)
-            speaker.closeSubpath()
-            p.drawPath(speaker)
+            sx = 7
+            
+            # Boxy speaker body
+            p.drawRect(sx, cy - 3, 4, 6)
+            
+            # Cone part
+            cone = QPainterPath()
+            cone.moveTo(sx + 4, cy - 3)
+            cone.lineTo(sx + 9, cy - 6)
+            cone.lineTo(sx + 9, cy + 6)
+            cone.lineTo(sx + 4, cy + 3)
+            cone.closeSubpath()
+            p.drawPath(cone)
+
             p.setBrush(QBrush(Qt.BrushStyle.NoBrush))
             if icon_open:
-                p.drawArc(QRect(sx + 9, cy - 7, 10, 14), -45 * 16, 90 * 16)
+                # Square sound waves
+                p.drawLine(sx + 12, cy - 4, sx + 12, cy + 4)
+                p.drawLine(sx + 15, cy - 6, sx + 15, cy + 6)
             else:
-                p.drawLine(sx + 14, cy - 6, sx + 3, cy + 6)
+                # X mark
+                p.drawLine(sx + 12, cy - 3, sx + 16, cy + 3)
+                p.drawLine(sx + 12, cy + 3, sx + 16, cy - 3)
 
         # ── Draw RED cancel section if active ──
         has_cancel = self._state in ["starting_mic", "starting_system", "listening", "processing"]
@@ -1450,6 +1458,7 @@ class MainWindow(QMainWindow):
         system_audio_row = QHBoxLayout()
         self.system_audio_cb = ToggleSwitch()
         self.system_audio_cb.setChecked(bool(data_manager.get("system_audio_enabled")))
+        self.system_audio_cb.toggled.connect(self._on_system_audio_toggled)
         system_audio_row.addWidget(self.system_audio_cb)
         system_audio_row.addWidget(QLabel("Use system sound instead of the microphone"))
         system_audio_row.addStretch()
@@ -1673,6 +1682,9 @@ class MainWindow(QMainWindow):
             self.status_label.setText("Startup Failed")
             self.status_label.setStyleSheet(f"color: white; background: {NB_PINK}; padding: 4px 10px; border: 2px solid {NB_BORDER};")
 
+    def _on_system_audio_toggled(self, checked):
+        self._on_save_audio()
+
     def _on_save_audio(self):
         data_manager.set("mic_device", self.mic_combo.currentText())
         data_manager.set("hotkey", self.current_hotkey_value.strip() or "ctrl+space")
@@ -1779,8 +1791,9 @@ class StypeEngine:
         self.recording = False
         self.processing = False
         self.cancelled = False
-        self.audio_frames = []
-        self._recording_source = "microphone"
+        self.audio_frames_mic = []
+        self.audio_frames_sys = []
+        self._system_stream_active = False
         self._audio_sample_rate = 16000
         self._recording_started_at = 0.0
         self._current_process_id = 0
@@ -1855,56 +1868,60 @@ class StypeEngine:
                 state_key = "processing"
         self.signals.state_changed.emit(state_key)
 
-    def _selected_audio_source(self):
-        return "system" if data_manager.get("system_audio_enabled") else "microphone"
-
-    def _start_audio_stream(self, source):
-        """Create or recreate the active audio stream."""
+    def _start_mic_stream(self):
         if hasattr(self, 'stream') and self.stream:
             return
-
-        self._recording_source = source
-        self.pill.set_capture_source(source)
-
+        self._audio_sample_rate = 16000
         try:
-            if source == "system":
-                loopback_settings = make_wasapi_loopback_settings()
-                device_idx, device = find_system_output_device()
-                if loopback_settings is None or device_idx is None or device is None:
-                    raise RuntimeError("System sound capture needs a WASAPI output device with loopback support.")
-
-                channels = max(1, min(2, int(device.get("max_output_channels", 1))))
-                samplerate = int(device.get("default_samplerate") or 48000)
-                self._audio_sample_rate = samplerate
-                self.stream = sd.InputStream(
-                    samplerate=samplerate,
-                    channels=channels,
-                    dtype="float32",
-                    device=device_idx,
-                    callback=self._audio_callback,
-                    extra_settings=loopback_settings
-                )
-            else:
-                mic_name = data_manager.get("mic_device")
-                device_idx = find_input_device_index(mic_name)
-                self._audio_sample_rate = 16000
-                self.stream = sd.InputStream(
-                    samplerate=16000,
-                    channels=1,
-                    dtype="float32",
-                    device=device_idx,
-                    callback=self._audio_callback
-                )
+            mic_name = data_manager.get("mic_device")
+            device_idx = find_input_device_index(mic_name)
+            self.stream = sd.InputStream(
+                samplerate=16000,
+                channels=1,
+                dtype="float32",
+                device=device_idx,
+                callback=self._mic_callback
+            )
             self.stream.start()
         except Exception as e:
             self.stream = None
-            print(f"[Stype] Failed to start {source} audio stream: {e}")
+            print(f"[Stype] Failed to start mic stream: {e}")
 
-    def _stop_audio_stream(self):
+    def _start_system_stream(self):
+        if hasattr(self, 'system_stream') and self.system_stream:
+            return
+        try:
+            self.system_stream = SystemAudioStream(self._sys_callback, samplerate=16000)
+            self.system_stream.start()
+            self._system_stream_active = True
+            self.pill.set_capture_source("system_active")
+        except Exception as e:
+            self.system_stream = None
+            self._system_stream_active = False
+            print(f"[Stype] Failed to start system stream: {e}")
+
+    def _stop_system_stream(self):
+        if hasattr(self, 'system_stream') and self.system_stream:
+            try:
+                self.system_stream.stop()
+            except Exception: pass
+            try:
+                if hasattr(self.system_stream, 'close'):
+                    self.system_stream.close()
+            except Exception: pass
+            self.system_stream = None
+        self._system_stream_active = False
+        self.pill.set_capture_source("microphone")
+
+    def _stop_mic_stream(self):
         if hasattr(self, 'stream') and self.stream:
             try:
                 self.stream.stop()
-                self.stream.close()
+            except Exception:
+                pass
+            try:
+                if hasattr(self.stream, 'close'):
+                    self.stream.close()
             except Exception:
                 pass
             self.stream = None
@@ -1933,19 +1950,21 @@ class StypeEngine:
 
     def _on_settings_changed(self):
         """Called when audio/hotkey settings are saved."""
-        self._register_hotkey()
         if self.recording:
             self._finish_recording(process_if_speech=False)
         else:
-            self._stop_audio_stream()
+            self._stop_mic_stream()
+            self._stop_system_stream()
+        self._register_hotkey()
         self.pill.set_system_audio_enabled(data_manager.get("system_audio_enabled"))
 
     def _reset_recording_state(self):
-        self.audio_frames = []
+        self.audio_frames_mic = []
+        self.audio_frames_sys = []
         self._recording_started_at = time.time()
 
     def _begin_processing(self):
-        if not self.audio_frames:
+        if not self.audio_frames_mic and not self.audio_frames_sys:
             self.processing = False
             self.cancelled = False
             self._emit_state("ready")
@@ -1965,28 +1984,37 @@ class StypeEngine:
             return
 
         self.recording = False
-        self._stop_audio_stream()
+        self._stop_mic_stream()
+        self._stop_system_stream()
 
-        if process_if_speech and self.audio_frames:
+        if process_if_speech and (self.audio_frames_mic or self.audio_frames_sys):
             self._begin_processing()
         else:
-            self.audio_frames = []
+            self.audio_frames_mic = []
+            self.audio_frames_sys = []
             self.processing = False
             self.cancelled = False
             self._emit_state("ready")
             self.tray_icon.setToolTip("Stype — Ready")
 
-    def _audio_callback(self, indata, frames, time_info, status):
+    def _mic_callback(self, indata, frames, time_info, status):
         if self.recording:
             chunk = indata.astype(np.float32, copy=True)
             if chunk.ndim > 1:
                 chunk = np.mean(chunk, axis=1, keepdims=True)
-            self.audio_frames.append(chunk)
+            self.audio_frames_mic.append(chunk)
 
             # Audio level for pill VU meter
             rms = np.sqrt(np.mean(chunk ** 2))
             level = min(1.0, (rms / 0.03) ** 0.5)  # boost lower volumes
             self.pill.set_audio_level(level)
+
+    def _sys_callback(self, indata, frames, time_info, status):
+        if self.recording and self._system_stream_active:
+            chunk = indata.astype(np.float32, copy=True)
+            if chunk.ndim > 1:
+                chunk = np.mean(chunk, axis=1, keepdims=True)
+            self.audio_frames_sys.append(chunk)
 
     def _cancel(self):
         if self.recording:
@@ -1995,13 +2023,19 @@ class StypeEngine:
         elif self.processing:
             self.cancelled = True
             self.processing = False
-            self.audio_frames = []
+            self.audio_frames_mic = []
+            self.audio_frames_sys = []
             self._current_process_id += 1
             self._emit_state("ready")
             self.tray_icon.setToolTip("Stype — Ready")
 
     def _toggle_system_audio(self):
-        self._toggle("system")
+        if not self.recording:
+            return
+        if self._system_stream_active:
+            self._stop_system_stream()
+        else:
+            self._start_system_stream()
 
     def _toggle(self, source=None):
         current_time = time.time()
@@ -2017,29 +2051,20 @@ class StypeEngine:
             return
 
         if not self.recording:
-            source = source or self._selected_audio_source()
-            self._recording_source = source
-            self.pill.set_capture_source(source)
-            if source == "system":
-                self._emit_state("starting_system")
-                self.tray_icon.setToolTip("Stype — Opening System Sound...")
-            else:
-                self._emit_state("starting_mic")
-                self.tray_icon.setToolTip("Stype — Opening Mic...")
+            self.pill.set_capture_source("microphone")
+            self._emit_state("starting_mic")
+            self.tray_icon.setToolTip("Stype — Opening Mic...")
             self._reset_recording_state()
-            threading.Thread(target=self._init_audio_and_record, args=(source,), daemon=True).start()
+            threading.Thread(target=self._init_audio_and_record, daemon=True).start()
         else:
             self._finish_recording(process_if_speech=True)
 
-    def _init_audio_and_record(self, source):
-        self._start_audio_stream(source)
+    def _init_audio_and_record(self):
+        self._start_mic_stream()
         if hasattr(self, 'stream') and self.stream is not None:
             self.recording = True
             self._emit_state("listening")
-            if source == "system":
-                self.tray_icon.setToolTip("Stype — Capturing System Sound...")
-            else:
-                self.tray_icon.setToolTip("Stype — Recording...")
+            self.tray_icon.setToolTip("Stype — Recording...")
         else:
             self._emit_state("ready")
             self.tray_icon.setToolTip("Stype — Ready")
@@ -2070,7 +2095,7 @@ class StypeEngine:
         if process_id != self._current_process_id:
             return
 
-        if not self.audio_frames:
+        if not self.audio_frames_mic and not self.audio_frames_sys:
             if process_id == self._current_process_id:
                 self.processing = False
                 self._emit_state("ready")
@@ -2078,9 +2103,28 @@ class StypeEngine:
             return
 
         sample_rate = self._audio_sample_rate
-        audio_data = np.concatenate(self.audio_frames, axis=0).flatten()
-        self.audio_frames = []
-        audio_data = resample_audio(audio_data, sample_rate)
+        
+        audio_data_mic = np.concatenate(self.audio_frames_mic, axis=0).flatten() if self.audio_frames_mic else np.zeros(0)
+        audio_data_sys = np.concatenate(self.audio_frames_sys, axis=0).flatten() if self.audio_frames_sys else np.zeros(0)
+        
+        self.audio_frames_mic = []
+        self.audio_frames_sys = []
+        
+        audio_data_mic = resample_audio(audio_data_mic, sample_rate)
+        audio_data_sys = resample_audio(audio_data_sys, sample_rate)
+        
+        max_len = max(len(audio_data_mic), len(audio_data_sys))
+        mixed_audio = np.zeros(max_len, dtype=np.float32)
+        if len(audio_data_mic) > 0: mixed_audio[:len(audio_data_mic)] += audio_data_mic
+        if len(audio_data_sys) > 0: mixed_audio[:len(audio_data_sys)] += audio_data_sys
+
+        # Prevent VAD filter crash/hang on micro-recordings
+        if len(mixed_audio) < sample_rate * 0.5:
+            if process_id == self._current_process_id:
+                self.processing = False
+                self._emit_state("ready")
+                self.tray_icon.setToolTip("Stype — Ready")
+            return
 
         try:
             vocab = []
@@ -2105,13 +2149,21 @@ class StypeEngine:
                 language="en"
             )
 
-            segments, _ = self.model.transcribe(audio_data, **transcribe_kwargs)
+            segments, _ = self.model.transcribe(mixed_audio, **transcribe_kwargs)
             
             # Check if user cancelled while we were working
             if self.cancelled or process_id != self._current_process_id:
                 return
 
             raw_text = "".join([s.text for s in segments]).strip()
+
+            # Anti-hallucination check: Whisper sometimes regurgitates the prompt on silence
+            if prompt and raw_text:
+                import re
+                clean_raw = re.sub(r'[^\w\s]', '', raw_text.lower()).strip()
+                clean_prompt = re.sub(r'[^\w\s]', '', prompt.lower()).strip()
+                if clean_raw in clean_prompt or clean_prompt in clean_raw:
+                    raw_text = ""
 
             if self.cancelled or process_id != self._current_process_id:
                 return
