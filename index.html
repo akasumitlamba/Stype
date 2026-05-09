@@ -8,7 +8,7 @@
       name="description"
       content="Stype is a private offline speech-to-text app for Windows with a new dashboard, floating pill overlay, personal dictionary, history, hotkeys, and local Whisper transcription."
     />
-    <link rel="stylesheet" href="website/style.css?v=4" />
+    <link rel="stylesheet" href="website/style.css?v=5" />
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to content</a>
@@ -41,7 +41,7 @@
           <p class="hero-lede">
             Stype turns speech into text locally with Whisper, then pastes it wherever you are typing.
             The new version gets a focused dashboard, a cleaner floating pill, searchable history,
-            a personal dictionary, auto-stop silence detection, and tighter engine controls.
+            a personal dictionary, system sound capture, and tighter engine controls.
           </p>
 
           <div class="hero-actions">
@@ -87,6 +87,9 @@
           </div>
 
           <div class="floating-pill">
+            <button class="sound-toggle" aria-label="System sound input" aria-pressed="false">
+              <span class="sound-icon" aria-hidden="true"></span>
+            </button>
             <div class="eq" aria-hidden="true">
               <span></span><span></span><span></span><span></span><span></span>
             </div>
@@ -105,7 +108,7 @@
             </div>
             <div>
               <span>Data path</span>
-              <strong>Mic -> local model -> clipboard</strong>
+              <strong>Mic or system sound -> local model -> clipboard</strong>
             </div>
           </div>
         </div>
@@ -122,7 +125,7 @@
             The dashboard stays available for setup, while the small pill overlay handles the actual dictation flow.
           </p>
           <p>
-            This release adds better control over the local engine, audio input, hotkeys, silence detection,
+            This release adds better control over the local engine, audio input, hotkeys, system sound capture,
             personal vocabulary, replacements, and transcription history.
           </p>
         </div>
@@ -134,7 +137,8 @@
           <span>Engine reload controls</span>
           <span>Mic picker</span>
           <span>Global hotkey capture</span>
-          <span>Auto-stop on silence</span>
+          <span>System sound capture</span>
+          <span>Speaker pill toggle</span>
           <span>Personal dictionary</span>
           <span>Searchable history</span>
           <span>Export history</span>
@@ -175,10 +179,10 @@
 
           <article class="story-step" data-story="audio">
             <p class="kicker">02 - Audio</p>
-            <h2>Control the microphone and hotkey.</h2>
+            <h2>Control the microphone, hotkey, and system sound.</h2>
             <p>
-              Choose a microphone, capture a global shortcut, and enable auto-stop after silence.
-              The default remains Ctrl + Space, but the dashboard now lets users change it cleanly.
+              Choose a microphone, capture a global shortcut, or switch the hotkey to transcribe audio
+              playing from Windows with the new speaker control on the pill.
             </p>
           </article>
 
@@ -222,7 +226,7 @@
           <article class="feature-card yellow">
             <span>03</span>
             <h3>Audio automation</h3>
-            <p>Microphone picker, global hotkey capture, silence auto-stop toggle, and configurable silence duration.</p>
+            <p>Microphone picker, global hotkey capture, and system sound input with a left-side speaker toggle on the pill.</p>
           </article>
           <article class="feature-card green">
             <span>04</span>
@@ -257,12 +261,12 @@
           <div class="flow-card">
             <strong>2</strong>
             <h3>Tap your hotkey</h3>
-            <p>The pill opens the mic, switches to Listening, and displays blocky equalizer bars from your audio level.</p>
+            <p>The pill opens the selected input, switches to Listening, and displays blocky equalizer bars from the audio level.</p>
           </div>
           <div class="flow-card">
             <strong>3</strong>
-            <h3>Finish or auto-stop</h3>
-            <p>Press the hotkey again, click the cancel area if needed, or let silence detection stop the recording.</p>
+            <h3>Finish or switch source</h3>
+            <p>Press the hotkey again, click the cancel area if needed, or use the left speaker button for system sound capture.</p>
           </div>
           <div class="flow-card">
             <strong>4</strong>
@@ -300,6 +304,6 @@
       </div>
     </footer>
 
-    <script src="website/script.js?v=4"></script>
+    <script src="website/script.js?v=5"></script>
   </body>
 </html>

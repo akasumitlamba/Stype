@@ -48,12 +48,12 @@
         <label>Global Hotkey</label>
         <div class="app-hotkey">CTRL+SPACE</div>
         <p class="app-help">Click to change - then press your new key combo</p>
-        <label>Auto-Stop on Silence</label>
+        <label>System Sound Input</label>
         <div class="app-toggle-row">
-          <span class="mini-toggle on"><i></i></span>
-          <strong>Enable auto-stop after silence</strong>
+          <span class="mini-toggle"><i></i></span>
+          <strong>Use system sound instead of the microphone</strong>
         </div>
-        <div class="duration-row"><span>Duration:</span><b>3.0</b><span>seconds</span></div>
+        <p class="app-help">The pill adds a left speaker button for capturing audio playing on Windows.</p>
         <button class="app-primary">Save Audio Settings</button>
       </div>
     `,

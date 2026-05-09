@@ -454,9 +454,9 @@ h3 {
   bottom: 166px;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   min-height: 38px;
-  padding: 5px 5px 5px 14px;
+  padding: 5px 5px 5px 5px;
   border: var(--line);
   border-radius: 8px;
   background: var(--bg);
@@ -468,13 +468,61 @@ h3 {
   font-weight: 950;
 }
 
-.floating-pill button {
+.floating-pill > button:not(.sound-toggle) {
   width: 30px;
   height: 28px;
   border: 2px solid var(--ink);
   background: var(--pink);
   color: #fff;
   font-weight: 950;
+}
+
+.sound-toggle {
+  position: relative;
+  width: 30px;
+  height: 28px;
+  display: inline-grid;
+  place-items: center;
+  border: 2px solid var(--ink);
+  background: #e0ddd5;
+  padding: 0;
+}
+
+.sound-icon {
+  position: relative;
+  width: 18px;
+  height: 16px;
+}
+
+.sound-icon::before {
+  content: "";
+  position: absolute;
+  left: 1px;
+  top: 4px;
+  width: 5px;
+  height: 8px;
+  background: var(--ink);
+}
+
+.sound-icon::after {
+  content: "";
+  position: absolute;
+  left: 6px;
+  top: 1px;
+  width: 0;
+  height: 0;
+  border-top: 7px solid transparent;
+  border-bottom: 7px solid transparent;
+  border-left: 9px solid var(--ink);
+}
+
+.sound-toggle::after {
+  content: "";
+  position: absolute;
+  width: 18px;
+  height: 3px;
+  background: var(--ink);
+  transform: rotate(-42deg);
 }
 
 .eq {
@@ -716,33 +764,24 @@ h3 {
   padding: 2px;
   border: 2px solid var(--ink);
   border-radius: 999px;
-  background: var(--orange);
+  background: #e0ddd5;
 }
 
 .mini-toggle i {
   width: 16px;
   height: 16px;
   display: block;
-  margin-left: auto;
   border: 2px solid var(--ink);
   border-radius: 50%;
   background: #fff;
 }
 
-.duration-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
+.mini-toggle.on {
+  background: var(--orange);
 }
 
-.duration-row b {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 48px;
-  height: 32px;
-  border: 2px solid var(--ink);
-  background: #fff;
+.mini-toggle.on i {
+  margin-left: auto;
 }
 
 .dict-head {

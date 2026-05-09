@@ -25,6 +25,26 @@
     ],
     "history": [
         {
+            "text": "After that, scan the app for the bugs and fix the bugs.",
+            "time": "2026-05-09T21:42:01.792438"
+        },
+        {
+            "text": "Once this is done, update the website as well that this feature is now there and remove old references.",
+            "time": "2026-05-09T21:31:59.995105"
+        },
+        {
+            "text": "sound and transcribe it into the text and paste it after.",
+            "time": "2026-05-09T21:31:34.026668"
+        },
+        {
+            "text": "So, when I'm using the system sound, or I press the shortcut key, just like the X button on the right side of the pill, I should get a sound icon of the left side of the pill, which is by default in the closed state. But if I click on it, it becomes in open state and listen to the system.",
+            "time": "2026-05-09T21:31:20.909713"
+        },
+        {
+            "text": "Remove the settings in audio which is auto-stopped on silence. It is no longer required. Remove the settings, remove its code, remove its reference from the website as well. and instead of that introduce a setting in audio to get input from the system sound.",
+            "time": "2026-05-09T21:30:47.609876"
+        },
+        {
             "text": "Quit app button should be a power icon with quit written on it.",
             "time": "2026-05-09T21:19:30.351964"
         },

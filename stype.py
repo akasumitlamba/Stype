@@ -39,9 +39,9 @@ from faster_whisper import WhisperModel
 
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-    QLabel, QComboBox, QPushButton, QFrame, QScrollArea, QSizePolicy,
-    QSystemTrayIcon, QMenu, QStackedWidget, QLineEdit, QFileDialog,
-    QCheckBox, QSlider, QTabWidget, QProgressBar, QTextEdit
+    QLabel, QComboBox, QPushButton, QFrame, QScrollArea,
+    QSystemTrayIcon, QMenu, QLineEdit, QFileDialog,
+    QCheckBox, QTabWidget, QTextEdit
 )
 from PyQt6.QtCore import (
     Qt, pyqtSignal, pyqtProperty, QObject, QTimer, QPropertyAnimation,
@@ -49,8 +49,7 @@ from PyQt6.QtCore import (
 )
 from PyQt6.QtGui import (
     QFont, QColor, QPainter, QPen, QBrush,
-    QRadialGradient, QCursor, QPainterPath, QPalette, QLinearGradient,
-    QIcon, QAction, QKeySequence
+    QPainterPath, QIcon, QAction, QKeySequence
 )
 # ═══════════════════════════════════════════════════════════
 #  CONSTANTS
@@ -76,8 +75,7 @@ DEFAULT_SETTINGS = {
     "device": "CPU",
     "language": "English",
     "mic_device": "",  # empty = system default
-    "auto_silence": True,
-    "silence_seconds": 3.0,
+    "system_audio_enabled": False,
     "launch_on_startup": False,
 }
 
@@ -331,6 +329,66 @@ def find_input_device_index(display_name):
             return device_idx
     return None
 
+def _wasapi_hostapi_index(hostapis):
+    for i, hostapi in enumerate(hostapis):
+        if "wasapi" in str(hostapi.get("name", "")).lower():
+            return i
+    return None
+
+def find_system_output_device():
+    """Return the default WASAPI output device for loopback capture."""
+    try:
+        devices = sd.query_devices()
+        hostapis = sd.query_hostapis()
+    except Exception:
+        return None, None
+
+    wasapi_idx = _wasapi_hostapi_index(hostapis)
+    if wasapi_idx is None:
+        return None, None
+
+    default_output = hostapis[wasapi_idx].get("default_output_device", -1)
+    if default_output is not None and int(default_output) >= 0:
+        device = devices[int(default_output)]
+        if int(device.get("max_output_channels", 0)) > 0:
+            return int(default_output), device
+
+    try:
+        default_pair = sd.default.device
+        default_device = default_pair[1] if isinstance(default_pair, (list, tuple)) else None
+        if default_device is not None and int(default_device) >= 0:
+            device = devices[int(default_device)]
+            if device.get("hostapi") == wasapi_idx and int(device.get("max_output_channels", 0)) > 0:
+                return int(default_device), device
+    except Exception:
+        pass
+
+    for i, device in enumerate(devices):
+        if device.get("hostapi") == wasapi_idx and int(device.get("max_output_channels", 0)) > 0:
+            return i, device
+
+    return None, None
+
+def make_wasapi_loopback_settings():
+    try:
+        return sd.WasapiSettings(loopback=True)
+    except (AttributeError, TypeError):
+        return None
+
+def resample_audio(audio_data, source_rate, target_rate=16000):
+    source_rate = int(source_rate or target_rate)
+    if source_rate == target_rate or audio_data.size < 2:
+        return audio_data.astype(np.float32, copy=False)
+
+    duration = audio_data.shape[0] / float(source_rate)
+    target_len = max(1, int(round(duration * target_rate)))
+    if target_len == audio_data.shape[0]:
+        return audio_data.astype(np.float32, copy=False)
+
+    old_x = np.linspace(0.0, duration, num=audio_data.shape[0], endpoint=False)
+    new_x = np.linspace(0.0, duration, num=target_len, endpoint=False)
+    return np.interp(new_x, old_x, audio_data).astype(np.float32)
+
 # ═══════════════════════════════════════════════════════════
 #  CONSTANTS
 # ═══════════════════════════════════════════════════════════
@@ -358,6 +416,7 @@ NB_SHADOW   = "#1A1A2E"   # hard shadow color
 STATES = {
     "loading":      {"label": "Loading...",    "dot": NB_YELLOW, "border": NB_INK},
     "starting_mic": {"label": "Opening Mic...", "dot": NB_MUTED,  "border": NB_INK},
+    "starting_system": {"label": "Opening Sound...", "dot": NB_BLUE, "border": NB_INK},
     "ready":        {"label": "Ready",         "dot": NB_GREEN,  "border": NB_INK},
     "listening":    {"label": "Listening...",  "dot": NB_GREEN,  "border": NB_INK},
     "processing":   {"label": "Processing...", "dot": NB_YELLOW, "border": NB_INK},
@@ -425,8 +484,6 @@ class BrutalComboBox(QComboBox):
 class Signals(QObject):
     state_changed = pyqtSignal(str)          
     transcription_done = pyqtSignal(str, int)
-    model_progress = pyqtSignal(str)         
-    auto_stop_requested = pyqtSignal()
 
 def post_process(text: str) -> str:
     text = text.strip()
@@ -512,6 +569,7 @@ class PillOverlay(QWidget):
     clicked_toggle = pyqtSignal()
     clicked_cancel = pyqtSignal()
     clicked_dashboard = pyqtSignal()
+    clicked_system_audio = pyqtSignal()
 
     def __init__(self):
         super().__init__()
@@ -536,6 +594,8 @@ class PillOverlay(QWidget):
         self._audio_level = 0.0  # 0.0 – 1.0
         self._rec_start = None
         self._manually_hidden = False
+        self._system_audio_enabled = False
+        self._capture_source = "microphone"
 
         self._hide_timer = QTimer(self)
         self._hide_timer.setSingleShot(True)
@@ -623,11 +683,25 @@ class PillOverlay(QWidget):
     def set_audio_level(self, level: float):
         self._audio_level = max(0.0, min(1.0, level))
 
+    def set_system_audio_enabled(self, enabled: bool):
+        self._system_audio_enabled = bool(enabled)
+        self.set_state(self._state)
+
+    def set_capture_source(self, source: str):
+        self._capture_source = source or "microphone"
+        self.update()
+
+    def _system_button_w(self):
+        return 26 if self._system_audio_enabled else 0
+
+    def _system_audio_open(self):
+        return self._capture_source == "system" and self._state in ["starting_system", "listening"]
+
     def set_state(self, state_key: str):
         self._state = state_key
 
         # If manually hidden, only show for active recording/pasting states
-        is_active = state_key in ["listening", "processing", "pasted", "starting_mic"]
+        is_active = state_key in ["listening", "processing", "pasted", "starting_mic", "starting_system"]
         should_be_visible = not self._manually_hidden or is_active
 
         if should_be_visible:
@@ -653,16 +727,18 @@ class PillOverlay(QWidget):
             self._rec_start = None
             self._audio_level = 0.0
 
-        if state_key in ["starting_mic", "listening"]:
-            target_w = 84  # Increased for better gap
+        icon_w = self._system_button_w()
+        if state_key in ["starting_mic", "starting_system", "listening"]:
+            target_w = 84 + icon_w
         elif state_key in ["processing"]:
-            target_w = 134 # Reduced to tighten gap
+            target_w = 134 + icon_w
         elif state_key in ["loading", "pasted"]:
-            target_w = 106
+            target_w = 106 + icon_w
         else:
-            target_w = self._ready_w
+            target_w = self._ready_w + icon_w
             
-        self._resize_and_center(target_w, self._active_h if target_w != self._ready_w else self._ready_h)
+        ready_w = self._ready_w + icon_w
+        self._resize_and_center(target_w, self._active_h if target_w != ready_w else self._ready_h)
 
         if state_key == "ready":
             self._hide_timer.stop() # Keep it always visible!
@@ -698,8 +774,38 @@ class PillOverlay(QWidget):
         pill_path.addRoundedRect(2, 2, w - 6, h - 6, radius, radius)
         p.fillPath(pill_path, QBrush(QColor(NB_BG)))
 
+        icon_w = self._system_button_w()
+        if icon_w:
+            icon_rect = QRect(2, 2, icon_w, h - 6)
+            icon_open = self._system_audio_open()
+            p.save()
+            p.setClipPath(pill_path)
+            p.fillRect(icon_rect, QColor(NB_BLUE if icon_open else "#E0DDD5"))
+            p.setPen(QPen(QColor(NB_BORDER), 2.0))
+            p.drawLine(2 + icon_w, 2, 2 + icon_w, h - 4)
+            p.restore()
+
+            p.setPen(QPen(QColor("#FFFFFF" if icon_open else NB_INK), 1.8, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+            p.setBrush(QBrush(QColor("#FFFFFF" if icon_open else NB_INK)))
+            cy = (h - shadow_offset + 4) // 2
+            sx = 8
+            speaker = QPainterPath()
+            speaker.moveTo(sx, cy - 4)
+            speaker.lineTo(sx + 4, cy - 4)
+            speaker.lineTo(sx + 9, cy - 8)
+            speaker.lineTo(sx + 9, cy + 8)
+            speaker.lineTo(sx + 4, cy + 4)
+            speaker.lineTo(sx, cy + 4)
+            speaker.closeSubpath()
+            p.drawPath(speaker)
+            p.setBrush(QBrush(Qt.BrushStyle.NoBrush))
+            if icon_open:
+                p.drawArc(QRect(sx + 9, cy - 7, 10, 14), -45 * 16, 90 * 16)
+            else:
+                p.drawLine(sx + 14, cy - 6, sx + 3, cy + 6)
+
         # ── Draw RED cancel section if active ──
-        has_cancel = self._state in ["starting_mic", "listening", "processing"]
+        has_cancel = self._state in ["starting_mic", "starting_system", "listening", "processing"]
         cancel_sec_w = 26
         if has_cancel:
             # Corrected right edge to w-4 to match rounded rect end
@@ -720,22 +826,23 @@ class PillOverlay(QWidget):
             # Three bold dots in orange
             p.setBrush(QBrush(QColor(NB_ORANGE)))
             p.setPen(QPen(QColor(NB_BORDER), 1.0))
-            cx, cy = (w - shadow_offset) // 2, (h - shadow_offset + 4) // 2
+            cx = icon_w + (w - icon_w - shadow_offset) // 2
+            cy = (h - shadow_offset + 4) // 2
             p.drawEllipse(QPoint(cx - 9, cy), 3, 3)
             p.drawEllipse(QPoint(cx, cy), 3, 3)
             p.drawEllipse(QPoint(cx + 9, cy), 3, 3)
             p.end()
             return
 
-        use_equalizer = self._state in ["starting_mic", "listening"]
+        use_equalizer = self._state in ["starting_mic", "starting_system", "listening"]
 
         if use_equalizer:
             bars = 5
             bar_w = 4
             spacing = 3
-            start_x = 14
+            start_x = 14 + icon_w
             
-            if self._state == "starting_mic":
+            if self._state in ["starting_mic", "starting_system"]:
                 heights = [6, 8, 12, 8, 6]
                 for i in range(bars):
                     bx = start_x + i * (bar_w + spacing)
@@ -771,7 +878,7 @@ class PillOverlay(QWidget):
             p.drawLine(cx - r, cy - r, cx + r, cy + r)
             p.drawLine(cx - r, cy + r, cx + r, cy - r)
         else:
-            dot_x = 16
+            dot_x = 16 + icon_w
             dot_y = (h - shadow_offset + 4) // 2
             dot_color = QColor(state["dot"])
             if self._state == "processing" and not self._blink_on:
@@ -795,7 +902,7 @@ class PillOverlay(QWidget):
             p.setPen(QColor(NB_INK))
             label = state["label"]
             # Ensure text doesn't hit the cancel section
-            text_rect = QRect(28, 0, w - (40 if self._state == "processing" else 34), h - shadow_offset + 2)
+            text_rect = QRect(28 + icon_w, 0, w - icon_w - (40 if self._state == "processing" else 34), h - shadow_offset + 2)
             p.drawText(text_rect, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft, label)
 
             if self._state == "processing":
@@ -822,8 +929,10 @@ class PillOverlay(QWidget):
     def mouseReleaseEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton and not self._drag_moved:
             w = self.width()
+            if self._system_audio_enabled and event.pos().x() <= self._system_button_w() + 4:
+                self.clicked_system_audio.emit()
             # If clicked on X button during active states
-            if self._state in ["listening", "starting_mic", "processing"] and event.pos().x() > w - 34:
+            elif self._state in ["listening", "starting_mic", "starting_system", "processing"] and event.pos().x() > w - 34:
                 self.clicked_cancel.emit()
             else:
                 self.clicked_toggle.emit()
@@ -1171,13 +1280,6 @@ class MainWindow(QMainWindow):
                 min-height: 28px;
             }}
             QLineEdit:focus {{ border-color: {NB_ORANGE}; }}
-            QLineEdit#silence_input {{
-                padding: 2px 7px;
-                min-height: 22px;
-                max-height: 24px;
-                font-size: 12px;
-                font-weight: 600;
-            }}
             QTabWidget::pane {{
                 border: none;
                 background: transparent;
@@ -1340,38 +1442,24 @@ class MainWindow(QMainWindow):
         hk_block.addWidget(hk_hint)
         al.addLayout(hk_block)
 
-        # Auto-silence block
-        silence_block = QVBoxLayout()
-        silence_block.setSpacing(10)
-        silence_block.addWidget(section_label("Auto-Stop on Silence"))
+        # System audio capture
+        system_audio_block = QVBoxLayout()
+        system_audio_block.setSpacing(10)
+        system_audio_block.addWidget(section_label("System Sound Input"))
 
-        silence_top_row = QHBoxLayout()
-        self.auto_silence_cb = ToggleSwitch()
-        auto_silence_val = data_manager.get("auto_silence")
-        self.auto_silence_cb.setChecked(bool(auto_silence_val))
-        silence_top_row.addWidget(self.auto_silence_cb)
-        silence_top_row.addWidget(QLabel("Enable auto-stop after silence"))
-        silence_top_row.addStretch()
-        silence_block.addLayout(silence_top_row)
+        system_audio_row = QHBoxLayout()
+        self.system_audio_cb = ToggleSwitch()
+        self.system_audio_cb.setChecked(bool(data_manager.get("system_audio_enabled")))
+        system_audio_row.addWidget(self.system_audio_cb)
+        system_audio_row.addWidget(QLabel("Use system sound instead of the microphone"))
+        system_audio_row.addStretch()
+        system_audio_block.addLayout(system_audio_row)
 
-        sec_row = QHBoxLayout()
-        sec_row.setSpacing(10)
-        sec_lbl = QLabel("Duration:")
-        sec_lbl.setStyleSheet(f"color: {NB_INK}; font-size: 12px; font-weight: 600;")
-        sec_row.addWidget(sec_lbl)
-        self.silence_input = QLineEdit()
-        self.silence_input.setObjectName("silence_input")
-        self.silence_input.setFixedWidth(48)
-        self.silence_input.setFixedHeight(26)
-        self.silence_input.setPlaceholderText("3.0")
-        self.silence_input.setText(f"{data_manager.get('silence_seconds'):.1f}")
-        sec_row.addWidget(self.silence_input)
-        sec_unit_lbl = QLabel("seconds")
-        sec_unit_lbl.setStyleSheet(f"color: {NB_MUTED}; font-size: 12px; font-weight: 600;")
-        sec_row.addWidget(sec_unit_lbl)
-        sec_row.addStretch()
-        silence_block.addLayout(sec_row)
-        al.addLayout(silence_block)
+        system_audio_hint = QLabel("When enabled, the pill shows a left speaker button. Open it or press the hotkey to capture audio playing on Windows.")
+        system_audio_hint.setObjectName("muted")
+        system_audio_hint.setWordWrap(True)
+        system_audio_block.addWidget(system_audio_hint)
+        al.addLayout(system_audio_block)
 
         al.addStretch()
 
@@ -1486,7 +1574,8 @@ class MainWindow(QMainWindow):
 
         # ── Footer hint
         hotkey_text = (data_manager.get("hotkey") or "ctrl+space").upper().replace("+", " + ")
-        hint = QLabel(f"<b>{hotkey_text}</b>  •  Close this window to run in background")
+        action_text = "capture system sound" if data_manager.get("system_audio_enabled") else "talk"
+        hint = QLabel(f"<b>{hotkey_text}</b> to {action_text}. Close this window to run in background.")
         hint.setObjectName("muted")
         hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
         hint.setContentsMargins(0, 4, 0, 0)
@@ -1560,7 +1649,7 @@ class MainWindow(QMainWindow):
         self.hotkey_btn.setEnabled(True)
         # Re-register the hotkey if engine is linked
         if hasattr(self, '_engine_ref') and self._engine_ref:
-            self._engine_ref._register_hotkey()
+            self._engine_ref._register_hotkey(hotkey)
 
     def _on_apply(self):
         model_name = self.model_combo.currentText()
@@ -1587,16 +1676,10 @@ class MainWindow(QMainWindow):
     def _on_save_audio(self):
         data_manager.set("mic_device", self.mic_combo.currentText())
         data_manager.set("hotkey", self.current_hotkey_value.strip() or "ctrl+space")
-        data_manager.set("auto_silence", self.auto_silence_cb.isChecked())
-        try:
-            secs = float(self.silence_input.text().strip())
-            secs = max(0.5, min(30.0, secs))
-        except ValueError:
-            secs = 3.0
-            self.silence_input.setText("3.0")
-        data_manager.set("silence_seconds", secs)
+        data_manager.set("system_audio_enabled", self.system_audio_cb.isChecked())
         hotkey_text = data_manager.get("hotkey").upper().replace("+", " + ")
-        self._hint_label.setText(f"<b>{hotkey_text}</b> to talk. Close window to run in background.")
+        action_text = "capture system sound" if data_manager.get("system_audio_enabled") else "talk"
+        self._hint_label.setText(f"<b>{hotkey_text}</b> to {action_text}. Close window to run in background.")
         self.settings_changed.emit()
 
     def _on_search(self, query):
@@ -1697,17 +1780,15 @@ class StypeEngine:
         self.processing = False
         self.cancelled = False
         self.audio_frames = []
-        self._silence_frames = 0
-        self._silent_seconds = 0.0
-        self._speech_seconds = 0.0
-        self._noise_floor = 0.0015
-        self._heard_speech = False
-        self._auto_stop_pending = False
+        self._recording_source = "microphone"
+        self._audio_sample_rate = 16000
         self._recording_started_at = 0.0
         self._current_process_id = 0
         self._current_hotkey = None
+        self._current_hotkey_text = None
 
         self.pill = PillOverlay()
+        self.pill.set_system_audio_enabled(data_manager.get("system_audio_enabled"))
         self.dashboard = MainWindow()
         self.dashboard._engine_ref = self  # allow hotkey capture to pause/resume hotkey
 
@@ -1716,11 +1797,11 @@ class StypeEngine:
         self.signals.state_changed.connect(self.pill.set_state)
         self.signals.state_changed.connect(self.dashboard.update_status)
         self.signals.transcription_done.connect(self._on_transcription)
-        self.signals.auto_stop_requested.connect(self._auto_stop)
         
         self.pill.clicked_toggle.connect(self._toggle)
         self.pill.clicked_cancel.connect(self._cancel)
         self.pill.clicked_dashboard.connect(self.dashboard.show)
+        self.pill.clicked_system_audio.connect(self._toggle_system_audio)
 
 
         self._pasted_timer = QTimer()
@@ -1774,24 +1855,50 @@ class StypeEngine:
                 state_key = "processing"
         self.signals.state_changed.emit(state_key)
 
-    def _start_audio_stream(self):
-        """Create or recreate the audio input stream with current mic settings."""
+    def _selected_audio_source(self):
+        return "system" if data_manager.get("system_audio_enabled") else "microphone"
+
+    def _start_audio_stream(self, source):
+        """Create or recreate the active audio stream."""
         if hasattr(self, 'stream') and self.stream:
             return
 
-        mic_name = data_manager.get("mic_device")
-        device_idx = find_input_device_index(mic_name)
+        self._recording_source = source
+        self.pill.set_capture_source(source)
 
         try:
-            self.stream = sd.InputStream(
-                samplerate=16000,
-                channels=1,
-                device=device_idx,
-                callback=self._audio_callback
-            )
+            if source == "system":
+                loopback_settings = make_wasapi_loopback_settings()
+                device_idx, device = find_system_output_device()
+                if loopback_settings is None or device_idx is None or device is None:
+                    raise RuntimeError("System sound capture needs a WASAPI output device with loopback support.")
+
+                channels = max(1, min(2, int(device.get("max_output_channels", 1))))
+                samplerate = int(device.get("default_samplerate") or 48000)
+                self._audio_sample_rate = samplerate
+                self.stream = sd.InputStream(
+                    samplerate=samplerate,
+                    channels=channels,
+                    dtype="float32",
+                    device=device_idx,
+                    callback=self._audio_callback,
+                    extra_settings=loopback_settings
+                )
+            else:
+                mic_name = data_manager.get("mic_device")
+                device_idx = find_input_device_index(mic_name)
+                self._audio_sample_rate = 16000
+                self.stream = sd.InputStream(
+                    samplerate=16000,
+                    channels=1,
+                    dtype="float32",
+                    device=device_idx,
+                    callback=self._audio_callback
+                )
             self.stream.start()
         except Exception as e:
-            print(f"[Stype] Failed to start audio stream: {e}")
+            self.stream = None
+            print(f"[Stype] Failed to start {source} audio stream: {e}")
 
     def _stop_audio_stream(self):
         if hasattr(self, 'stream') and self.stream:
@@ -1802,39 +1909,40 @@ class StypeEngine:
                 pass
             self.stream = None
 
-    def _register_hotkey(self):
+    def _register_hotkey(self, hotkey=None):
         """Register the global hotkey from settings."""
         if self._current_hotkey:
             try:
                 keyboard.remove_hotkey(self._current_hotkey)
             except Exception:
                 pass
-        hotkey = data_manager.get("hotkey") or "ctrl+space"
+            self._current_hotkey = None
+        hotkey = hotkey or data_manager.get("hotkey") or "ctrl+space"
         try:
             self._current_hotkey = keyboard.add_hotkey(hotkey, self._toggle)
+            self._current_hotkey_text = hotkey
         except Exception as e:
             print(f"[Stype] Failed to register hotkey '{hotkey}': {e}")
-            self._current_hotkey = keyboard.add_hotkey('ctrl+space', self._toggle)
+            try:
+                self._current_hotkey = keyboard.add_hotkey("ctrl+space", self._toggle)
+                self._current_hotkey_text = "ctrl+space"
+            except Exception as fallback_error:
+                print(f"[Stype] Failed to register fallback hotkey 'ctrl+space': {fallback_error}")
+                self._current_hotkey = None
+                self._current_hotkey_text = None
 
     def _on_settings_changed(self):
         """Called when audio/hotkey settings are saved."""
         self._register_hotkey()
-        self._stop_audio_stream()
+        if self.recording:
+            self._finish_recording(process_if_speech=False)
+        else:
+            self._stop_audio_stream()
+        self.pill.set_system_audio_enabled(data_manager.get("system_audio_enabled"))
 
     def _reset_recording_state(self):
         self.audio_frames = []
-        self._silence_frames = 0
-        self._silent_seconds = 0.0
-        self._speech_seconds = 0.0
-        self._noise_floor = 0.0015
-        self._heard_speech = False
-        self._auto_stop_pending = False
         self._recording_started_at = time.time()
-
-    def _request_auto_stop(self):
-        if not self._auto_stop_pending:
-            self._auto_stop_pending = True
-            self.signals.auto_stop_requested.emit()
 
     def _begin_processing(self):
         if not self.audio_frames:
@@ -1859,7 +1967,7 @@ class StypeEngine:
         self.recording = False
         self._stop_audio_stream()
 
-        if process_if_speech and self._heard_speech:
+        if process_if_speech and self.audio_frames:
             self._begin_processing()
         else:
             self.audio_frames = []
@@ -1870,56 +1978,15 @@ class StypeEngine:
 
     def _audio_callback(self, indata, frames, time_info, status):
         if self.recording:
-            self.audio_frames.append(indata.copy())
+            chunk = indata.astype(np.float32, copy=True)
+            if chunk.ndim > 1:
+                chunk = np.mean(chunk, axis=1, keepdims=True)
+            self.audio_frames.append(chunk)
 
             # Audio level for pill VU meter
-            rms = np.sqrt(np.mean(indata ** 2))
+            rms = np.sqrt(np.mean(chunk ** 2))
             level = min(1.0, (rms / 0.03) ** 0.5)  # boost lower volumes
             self.pill.set_audio_level(level)
-
-            elapsed = max(0.0, time.time() - self._recording_started_at)
-            chunk_seconds = max(0.001, frames / 16000.0)
-            speech_threshold = max(0.0035, self._noise_floor * 2.2)
-            speech_like = rms > speech_threshold
-            if elapsed < 0.45:
-                speech_like = False
-
-            if speech_like:
-                self._speech_seconds += chunk_seconds
-                self._silent_seconds = 0.0
-                if self._speech_seconds >= 0.12:
-                    self._heard_speech = True
-            else:
-                self._speech_seconds = max(0.0, self._speech_seconds - chunk_seconds)
-                self._silent_seconds += chunk_seconds
-                self._noise_floor = (self._noise_floor * 0.96) + (rms * 0.04)
-
-            if data_manager.get("auto_silence"):
-                silence_limit = max(0.5, float(data_manager.get("silence_seconds") or 3.0))
-                if self._heard_speech and self._silent_seconds >= silence_limit:
-                    self._request_auto_stop()
-                elif not self._heard_speech and elapsed >= silence_limit:
-                    self._request_auto_stop()
-
-            # Auto-silence detection
-            if data_manager.get("auto_silence"):
-                silence_threshold = 0.002
-                if rms < silence_threshold:
-                    self._silence_frames += 1
-                else:
-                    self._silence_frames = 0
-
-                silence_limit = data_manager.get("silence_seconds")
-                # 16000 Hz, ~1024 frames per callback → ~62 callbacks/sec
-                if self._silence_frames > (silence_limit * 62):
-                    self._silence_frames = 0
-                    # Auto-stop on main thread
-                    self._request_auto_stop()
-
-    def _auto_stop(self):
-        """Stop recording due to silence detection."""
-        if self.recording and not self.processing:
-            self._finish_recording(process_if_speech=True)
 
     def _cancel(self):
         if self.recording:
@@ -1933,7 +2000,10 @@ class StypeEngine:
             self._emit_state("ready")
             self.tray_icon.setToolTip("Stype — Ready")
 
-    def _toggle(self):
+    def _toggle_system_audio(self):
+        self._toggle("system")
+
+    def _toggle(self, source=None):
         current_time = time.time()
         if hasattr(self, '_last_toggle') and current_time - self._last_toggle < 0.5:
             return
@@ -1947,19 +2017,29 @@ class StypeEngine:
             return
 
         if not self.recording:
-            self._emit_state("starting_mic")
-            self.tray_icon.setToolTip("Stype — Opening Mic...")
+            source = source or self._selected_audio_source()
+            self._recording_source = source
+            self.pill.set_capture_source(source)
+            if source == "system":
+                self._emit_state("starting_system")
+                self.tray_icon.setToolTip("Stype — Opening System Sound...")
+            else:
+                self._emit_state("starting_mic")
+                self.tray_icon.setToolTip("Stype — Opening Mic...")
             self._reset_recording_state()
-            threading.Thread(target=self._init_mic_and_record, daemon=True).start()
+            threading.Thread(target=self._init_audio_and_record, args=(source,), daemon=True).start()
         else:
             self._finish_recording(process_if_speech=True)
 
-    def _init_mic_and_record(self):
-        self._start_audio_stream()
+    def _init_audio_and_record(self, source):
+        self._start_audio_stream(source)
         if hasattr(self, 'stream') and self.stream is not None:
             self.recording = True
             self._emit_state("listening")
-            self.tray_icon.setToolTip("Stype — Recording...")
+            if source == "system":
+                self.tray_icon.setToolTip("Stype — Capturing System Sound...")
+            else:
+                self.tray_icon.setToolTip("Stype — Recording...")
         else:
             self._emit_state("ready")
             self.tray_icon.setToolTip("Stype — Ready")
@@ -1997,8 +2077,10 @@ class StypeEngine:
             self.tray_icon.setToolTip("Stype — Ready")
             return
 
+        sample_rate = self._audio_sample_rate
         audio_data = np.concatenate(self.audio_frames, axis=0).flatten()
         self.audio_frames = []
+        audio_data = resample_audio(audio_data, sample_rate)
 
         try:
             vocab = []
@@ -2060,7 +2142,7 @@ class StypeEngine:
         self.dashboard.history_layout.insertWidget(0, item)
 
         # Paste text
-        hotkey = data_manager.get("hotkey") or "ctrl+space"
+        hotkey = self._current_hotkey_text or data_manager.get("hotkey") or "ctrl+space"
         pyperclip.copy(text)
         for key in hotkey.split("+"):
             try:
