@@ -25,6 +25,18 @@
     ],
     "history": [
         {
+            "text": "Quit app button should be a power icon with quit written on it.",
+            "time": "2026-05-09T21:19:30.351964"
+        },
+        {
+            "text": "There are few issues here. First of all, the silence of 3 seconds or whatever it is said to is not working. It is actively listening for the background noise and everything and not the words. So it never quits. Also apart from that, if it does not quit and I press the shortcut when it has recorded the noise background noise, noise then it is not even completing the processing and I am not even able to click the cross button to cancel that. Eventually if I want to exit and actually use the application moving forward I have to quit the whole app and then open it again. This is not good fix this issue.",
+            "time": "2026-05-09T21:19:14.113909"
+        },
+        {
+            "text": "In the app, the mic selection lists too many mics, which I think are not useful at all because currently I already have only one mic in my system but I don't know why it is listing so many. So can you check that and fix if possible?",
+            "time": "2026-05-09T21:15:16.827335"
+        },
+        {
             "text": "Once upon a time, there was a crow.",
             "time": "2026-05-09T21:14:06.200972"
         },

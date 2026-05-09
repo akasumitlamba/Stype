@@ -41,7 +41,7 @@ from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QComboBox, QPushButton, QFrame, QScrollArea, QSizePolicy,
     QSystemTrayIcon, QMenu, QStackedWidget, QLineEdit, QFileDialog,
-    QCheckBox, QSlider, QTabWidget, QProgressBar, QTextEdit, QStyle
+    QCheckBox, QSlider, QTabWidget, QProgressBar, QTextEdit
 )
 from PyQt6.QtCore import (
     Qt, pyqtSignal, pyqtProperty, QObject, QTimer, QPropertyAnimation,
@@ -223,6 +223,18 @@ data_manager = DataManager()
 
 STARTUP_APP_NAME = "Stype"
 STARTUP_RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
+PREFERRED_MIC_APIS = ("Windows WASAPI", "Windows DirectSound", "MME")
+HIDDEN_MIC_APIS = {"Windows WDM-KS"}
+HIDDEN_MIC_NAME_PARTS = (
+    "microsoft sound mapper",
+    "primary sound capture driver",
+    "primary sound driver",
+    "stereo mix",
+    "pc speaker",
+    "speakers",
+    "headphones",
+    "output ",
+)
 
 def startup_command():
     if getattr(sys, "frozen", False):
@@ -257,6 +269,67 @@ def set_launch_on_startup(enabled):
     except OSError as e:
         print(f"[Stype] Startup setting failed: {e}")
         return False
+
+def _clean_device_name(name):
+    return re.sub(r"\s+", " ", str(name).replace("\r", " ").replace("\n", " ")).strip()
+
+def _mic_sort_key(item):
+    display_name, _device_idx, hostapi_name = item
+    try:
+        api_rank = PREFERRED_MIC_APIS.index(hostapi_name)
+    except ValueError:
+        api_rank = len(PREFERRED_MIC_APIS)
+    return (api_rank, display_name.lower())
+
+def _mic_dedupe_key(display_name):
+    base = re.sub(r"\s+\d+\s*\(\)\s*$", "", display_name.lower()).strip()
+    if "(" in base:
+        base = base.split("(", 1)[0].strip()
+    return base
+
+def get_input_devices():
+    try:
+        devices = sd.query_devices()
+        hostapis = sd.query_hostapis()
+    except Exception:
+        return []
+
+    candidates = []
+    fallback = []
+    for i, device in enumerate(devices):
+        if int(device.get("max_input_channels", 0)) <= 0:
+            continue
+
+        name = _clean_device_name(device.get("name", ""))
+        hostapi_name = hostapis[device.get("hostapi", 0)].get("name", "")
+        lower_name = name.lower()
+        item = (name, i, hostapi_name)
+
+        if not name or any(part in lower_name for part in HIDDEN_MIC_NAME_PARTS):
+            continue
+        if hostapi_name in HIDDEN_MIC_APIS:
+            fallback.append(item)
+            continue
+        candidates.append(item)
+
+    usable = candidates or fallback
+    best_by_name = {}
+    for item in usable:
+        display_name = item[0]
+        key = _mic_dedupe_key(display_name)
+        if key not in best_by_name or _mic_sort_key(item) < _mic_sort_key(best_by_name[key]):
+            best_by_name[key] = item
+
+    return sorted(best_by_name.values(), key=_mic_sort_key)
+
+def find_input_device_index(display_name):
+    wanted = _clean_device_name(display_name)
+    if not wanted or wanted == "System Default":
+        return None
+    for name, device_idx, _hostapi_name in get_input_devices():
+        if name == wanted:
+            return device_idx
+    return None
 
 # ═══════════════════════════════════════════════════════════
 #  CONSTANTS
@@ -351,8 +424,9 @@ class BrutalComboBox(QComboBox):
 
 class Signals(QObject):
     state_changed = pyqtSignal(str)          
-    transcription_done = pyqtSignal(str)     
+    transcription_done = pyqtSignal(str, int)
     model_progress = pyqtSignal(str)         
+    auto_stop_requested = pyqtSignal()
 
 def post_process(text: str) -> str:
     text = text.strip()
@@ -1066,9 +1140,9 @@ class MainWindow(QMainWindow):
                 background-color: {NB_PINK};
                 color: #ffffff;
                 font-weight: 900;
-                font-size: 12px;
+                font-size: 13px;
                 border: 2px solid {NB_BORDER};
-                padding: 4px 10px;
+                padding: 4px 12px;
                 min-height: 24px;
             }}
             QPushButton#quit_btn:hover {{
@@ -1174,10 +1248,9 @@ class MainWindow(QMainWindow):
         self.status_label.setFont(QFont("Inter", 11, QFont.Weight.Bold))
         self.status_label.setStyleSheet(f"color: {NB_YELLOW}; background: {NB_INK}; padding: 4px 10px; border: 2px solid {NB_BORDER};")
         header.addWidget(self.status_label)
-        quit_btn = QPushButton("Quit")
+        quit_btn = QPushButton("⏻ Quit")
         quit_btn.setObjectName("quit_btn")
-        quit_btn.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogCloseButton))
-        quit_btn.setFixedWidth(74)
+        quit_btn.setFixedWidth(86)
         quit_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         quit_btn.setToolTip("Quit Stype completely")
         quit_btn.clicked.connect(QApplication.instance().quit)
@@ -1423,13 +1496,8 @@ class MainWindow(QMainWindow):
     def _populate_mics(self):
         self.mic_combo.clear()
         self.mic_combo.addItem("System Default")
-        try:
-            devices = sd.query_devices()
-            for i, d in enumerate(devices):
-                if d['max_input_channels'] > 0:
-                    self.mic_combo.addItem(f"{d['name']}", i)
-        except Exception:
-            pass
+        for name, device_idx, _hostapi_name in get_input_devices():
+            self.mic_combo.addItem(name, device_idx)
         saved = data_manager.get("mic_device")
         if saved:
             idx = self.mic_combo.findText(saved)
@@ -1629,7 +1697,14 @@ class StypeEngine:
         self.processing = False
         self.cancelled = False
         self.audio_frames = []
-        self._silence_frames = 0  # count of consecutive silent frames
+        self._silence_frames = 0
+        self._silent_seconds = 0.0
+        self._speech_seconds = 0.0
+        self._noise_floor = 0.0015
+        self._heard_speech = False
+        self._auto_stop_pending = False
+        self._recording_started_at = 0.0
+        self._current_process_id = 0
         self._current_hotkey = None
 
         self.pill = PillOverlay()
@@ -1641,6 +1716,7 @@ class StypeEngine:
         self.signals.state_changed.connect(self.pill.set_state)
         self.signals.state_changed.connect(self.dashboard.update_status)
         self.signals.transcription_done.connect(self._on_transcription)
+        self.signals.auto_stop_requested.connect(self._auto_stop)
         
         self.pill.clicked_toggle.connect(self._toggle)
         self.pill.clicked_cancel.connect(self._cancel)
@@ -1704,16 +1780,7 @@ class StypeEngine:
             return
 
         mic_name = data_manager.get("mic_device")
-        device_idx = None
-        if mic_name and mic_name != "System Default":
-            try:
-                devices = sd.query_devices()
-                for i, d in enumerate(devices):
-                    if d['name'] == mic_name and d['max_input_channels'] > 0:
-                        device_idx = i
-                        break
-            except Exception:
-                pass
+        device_idx = find_input_device_index(mic_name)
 
         try:
             self.stream = sd.InputStream(
@@ -1754,6 +1821,53 @@ class StypeEngine:
         self._register_hotkey()
         self._stop_audio_stream()
 
+    def _reset_recording_state(self):
+        self.audio_frames = []
+        self._silence_frames = 0
+        self._silent_seconds = 0.0
+        self._speech_seconds = 0.0
+        self._noise_floor = 0.0015
+        self._heard_speech = False
+        self._auto_stop_pending = False
+        self._recording_started_at = time.time()
+
+    def _request_auto_stop(self):
+        if not self._auto_stop_pending:
+            self._auto_stop_pending = True
+            self.signals.auto_stop_requested.emit()
+
+    def _begin_processing(self):
+        if not self.audio_frames:
+            self.processing = False
+            self.cancelled = False
+            self._emit_state("ready")
+            self.tray_icon.setToolTip("Stype — Ready")
+            return
+
+        self.processing = True
+        self.cancelled = False
+        self._current_process_id += 1
+        process_id = self._current_process_id
+        self._emit_state("processing")
+        self.tray_icon.setToolTip("Stype — Processing...")
+        threading.Thread(target=self._process, args=(process_id,), daemon=True).start()
+
+    def _finish_recording(self, process_if_speech=True):
+        if not self.recording:
+            return
+
+        self.recording = False
+        self._stop_audio_stream()
+
+        if process_if_speech and self._heard_speech:
+            self._begin_processing()
+        else:
+            self.audio_frames = []
+            self.processing = False
+            self.cancelled = False
+            self._emit_state("ready")
+            self.tray_icon.setToolTip("Stype — Ready")
+
     def _audio_callback(self, indata, frames, time_info, status):
         if self.recording:
             self.audio_frames.append(indata.copy())
@@ -1762,6 +1876,30 @@ class StypeEngine:
             rms = np.sqrt(np.mean(indata ** 2))
             level = min(1.0, (rms / 0.03) ** 0.5)  # boost lower volumes
             self.pill.set_audio_level(level)
+
+            elapsed = max(0.0, time.time() - self._recording_started_at)
+            chunk_seconds = max(0.001, frames / 16000.0)
+            speech_threshold = max(0.0035, self._noise_floor * 2.2)
+            speech_like = rms > speech_threshold
+            if elapsed < 0.45:
+                speech_like = False
+
+            if speech_like:
+                self._speech_seconds += chunk_seconds
+                self._silent_seconds = 0.0
+                if self._speech_seconds >= 0.12:
+                    self._heard_speech = True
+            else:
+                self._speech_seconds = max(0.0, self._speech_seconds - chunk_seconds)
+                self._silent_seconds += chunk_seconds
+                self._noise_floor = (self._noise_floor * 0.96) + (rms * 0.04)
+
+            if data_manager.get("auto_silence"):
+                silence_limit = max(0.5, float(data_manager.get("silence_seconds") or 3.0))
+                if self._heard_speech and self._silent_seconds >= silence_limit:
+                    self._request_auto_stop()
+                elif not self._heard_speech and elapsed >= silence_limit:
+                    self._request_auto_stop()
 
             # Auto-silence detection
             if data_manager.get("auto_silence"):
@@ -1776,29 +1914,22 @@ class StypeEngine:
                 if self._silence_frames > (silence_limit * 62):
                     self._silence_frames = 0
                     # Auto-stop on main thread
-                    QTimer.singleShot(0, self._auto_stop)
+                    self._request_auto_stop()
 
     def _auto_stop(self):
         """Stop recording due to silence detection."""
         if self.recording and not self.processing:
-            self.recording = False
-            self._stop_audio_stream()
-            self.processing = True
-            self.cancelled = False
-            self._emit_state("processing")
-            threading.Thread(target=self._process, daemon=True).start()
+            self._finish_recording(process_if_speech=True)
 
     def _cancel(self):
         if self.recording:
-            self.recording = False
-            self._stop_audio_stream()
-            self.audio_frames = []
-            self._emit_state("ready")
+            self._finish_recording(process_if_speech=False)
             self.tray_icon.setToolTip("Stype — Ready")
         elif self.processing:
             self.cancelled = True
             self.processing = False
             self.audio_frames = []
+            self._current_process_id += 1
             self._emit_state("ready")
             self.tray_icon.setToolTip("Stype — Ready")
 
@@ -1808,23 +1939,20 @@ class StypeEngine:
             return
         self._last_toggle = current_time
 
-        if self.model is None or self.processing:
+        if self.processing:
+            self._cancel()
+            return
+
+        if self.model is None:
             return
 
         if not self.recording:
             self._emit_state("starting_mic")
             self.tray_icon.setToolTip("Stype — Opening Mic...")
-            self.audio_frames = []
-            self._silence_frames = 0
+            self._reset_recording_state()
             threading.Thread(target=self._init_mic_and_record, daemon=True).start()
         else:
-            self.recording = False
-            self._stop_audio_stream()
-            self.processing = True
-            self.cancelled = False
-            self._emit_state("processing")
-            self.tray_icon.setToolTip("Stype — Processing...")
-            threading.Thread(target=self._process, daemon=True).start()
+            self._finish_recording(process_if_speech=True)
 
     def _init_mic_and_record(self):
         self._start_audio_stream()
@@ -1858,10 +1986,14 @@ class StypeEngine:
         self.model = None
         threading.Thread(target=self._load_model, args=(model_id, device), daemon=True).start()
 
-    def _process(self):
+    def _process(self, process_id):
+        if process_id != self._current_process_id:
+            return
+
         if not self.audio_frames:
-            self.processing = False
-            self._emit_state("ready")
+            if process_id == self._current_process_id:
+                self.processing = False
+                self._emit_state("ready")
             self.tray_icon.setToolTip("Stype — Ready")
             return
 
@@ -1894,25 +2026,32 @@ class StypeEngine:
             segments, _ = self.model.transcribe(audio_data, **transcribe_kwargs)
             
             # Check if user cancelled while we were working
-            if self.cancelled:
+            if self.cancelled or process_id != self._current_process_id:
                 return
 
             raw_text = "".join([s.text for s in segments]).strip()
 
+            if self.cancelled or process_id != self._current_process_id:
+                return
+
             if raw_text:
                 final_text = post_process(raw_text)
-                self.signals.transcription_done.emit(final_text)
-            else:
+                self.signals.transcription_done.emit(final_text, process_id)
+            elif process_id == self._current_process_id:
                 self._emit_state("ready")
                 self.tray_icon.setToolTip("Stype — Ready")
                 self.processing = False
 
         except Exception as e:
             print(f"[Stype] Transcription error: {e}")
-            self._emit_state("ready")
-            self.processing = False
+            if process_id == self._current_process_id:
+                self._emit_state("ready")
+                self.processing = False
 
-    def _on_transcription(self, text):
+    def _on_transcription(self, text, process_id):
+        if self.cancelled or process_id != self._current_process_id:
+            return
+
         data_manager.add_history(text)
 
         # Get the latest history entry (dict with timestamp)
