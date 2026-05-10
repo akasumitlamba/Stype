@@ -7,6 +7,7 @@ UninstallDisplayIcon={app}\Stype.exe
 Compression=lzma2
 SolidCompression=yes
 OutputDir=dist
+DiskSpanning=yes
 ; This points to your icon file for the installer itself
 SetupIconFile="assets\icon.ico"
 

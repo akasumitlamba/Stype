@@ -383,10 +383,7 @@ def resample_audio(audio_data, source_rate, target_rate=16000):
 #  CONSTANTS
 # ═══════════════════════════════════════════════════════════
 MODELS = {
-    "Fast (Base)":    "base.en",
-    "Balanced (Small)": "small.en",
-    "Accurate (Medium)": "medium.en",
-    "Best (Large v3)": "large-v3",
+    "Balanced": "small.en",
 }
 
 # ── Neobrutalism Palette ──
@@ -1393,10 +1390,8 @@ class MainWindow(QMainWindow):
             block.addWidget(widget)
             return block
 
-        self.model_combo = BrutalComboBox()
-        self.model_combo.addItems(list(MODELS.keys()))
-        self.model_combo.setCurrentText(data_manager.get("model") or "Balanced (Small)")
-        el.addLayout(field_block("Accuracy Model", self.model_combo))
+        # Model selection removed as we only use 'small.en' now
+        data_manager.set("model", "small.en")
 
         self.device_combo = BrutalComboBox()
         self.device_combo.addItems(["CPU", "GPU (NVIDIA CUDA)"])
