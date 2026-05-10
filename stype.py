@@ -342,6 +342,8 @@ class SystemAudioStream:
 
     def _run(self):
         import soundcard as sc
+        import warnings
+        warnings.filterwarnings("ignore", message="data discontinuity in recording")
         try:
             mics = sc.all_microphones(include_loopback=True)
             if not mics: return
@@ -1781,8 +1783,9 @@ class MainWindow(QMainWindow):
 # ═══════════════════════════════════════════════════════════
 #  MAIN ENGINE — Enhanced
 # ═══════════════════════════════════════════════════════════
-class StypeEngine:
+class StypeEngine(QObject):
     def __init__(self):
+        super().__init__()
         self.signals = Signals()
         self.model = None
         self.recording = False
