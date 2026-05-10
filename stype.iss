@@ -1,6 +1,6 @@
 [Setup]
 AppName=Stype
-AppVersion=1.0
+AppVersion=2.0
 DefaultDirName={pf}\Stype
 DefaultGroupName=Stype
 UninstallDisplayIcon={app}\Stype.exe

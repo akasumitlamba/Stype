@@ -218,9 +218,10 @@ select {
 
 .kicker {
   display: inline-flex;
+  align-items: center;
   width: fit-content;
   margin: 0 0 18px;
-  padding: 6px 10px;
+  padding: 6px 12px;
   border: 2px solid var(--ink);
   background: var(--yellow);
   color: var(--ink);
@@ -1050,7 +1051,12 @@ h3 {
   }
 
   .site-footer .brand-mark {
+    background: transparent;
+    border-color: #fff;
     box-shadow: 4px 4px 0 #fff;
+  }
+
+  .site-footer .brand-mark span {
     border-color: #fff;
   }
 

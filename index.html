@@ -1,320 +1,348 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Stype - Offline Dictation for Windows</title>
-    <meta
-      name="description"
-      content="Stype is a private offline speech-to-text app for Windows with a new dashboard, floating pill overlay, personal dictionary, history, hotkeys, and local Whisper transcription."
-    />
-    <link rel="icon" type="image/png" href="website/images/image.png" />
-    <link rel="stylesheet" href="website/style.css?v=17" />
-  </head>
-  <body>
-    <a class="skip-link" href="#main">Skip to content</a>
 
-    <header class="site-nav" data-sticky-nav>
-      <a class="brand" href="#" aria-label="Stype home">
-        <span class="brand-mark" aria-hidden="true">
-          <span></span><span></span><span></span>
-        </span>
-        <span>Stype</span>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Stype v2.0 - Offline Dictation for Windows</title>
+  <meta name="description"
+    content="Stype is a private offline speech-to-text app for Windows with a new dashboard, floating pill overlay, personal dictionary, history, hotkeys, and local Whisper transcription." />
+  <link rel="icon" type="image/png" href="website/images/image.png" />
+  <link rel="stylesheet" href="website/style.css?v=21" />
+</head>
+
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <header class="site-nav" data-sticky-nav>
+    <a class="brand" href="#" aria-label="Stype home">
+      <span class="brand-mark" aria-hidden="true">
+        <span></span><span></span><span></span>
+      </span>
+      <span>Stype</span>
+    </a>
+
+    <nav class="nav-links" aria-label="Primary navigation">
+      <a href="#new">New version</a>
+      <a href="#dashboard">Dashboard</a>
+      <a href="#features">Features</a>
+      <a href="#privacy">Privacy</a>
+    </nav>
+
+    <div style="display: flex; gap: 12px;">
+      <a class="nav-cta" href="https://github.com/akasumitlamba/Stype/releases" target="_blank" rel="noopener">
+        Releases
       </a>
+      <a class="nav-cta" href="https://github.com/akasumitlamba/Stype/releases/latest" target="_blank" rel="noopener"
+        aria-label="Download Latest" style="padding: 9px 12px; background: var(--orange); color: #fff;">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+          <polyline points="7 10 12 15 17 10"></polyline>
+          <line x1="12" y1="15" x2="12" y2="3"></line>
+        </svg>
+      </a>
+    </div>
+  </header>
 
-      <nav class="nav-links" aria-label="Primary navigation">
-        <a href="#new">New version</a>
-        <a href="#dashboard">Dashboard</a>
-        <a href="#features">Features</a>
-        <a href="#privacy">Privacy</a>
-      </nav>
+  <main id="main">
+    <section class="hero section-band">
+      <div class="hero-copy">
+        <p class="kicker">Offline speech-to-text by Sumit Kumar Lamba</p>
+        <h1>Dictation that feels built into Windows.</h1>
+        <p class="hero-lede">
+          Stype turns speech into text locally with Whisper, then pastes it wherever you are typing.
+          The new version gets a focused dashboard, a cleaner floating pill, searchable history,
+          a personal dictionary, system sound capture, and tighter engine controls.
+        </p>
 
-      <div style="display: flex; gap: 12px;">
-        <a class="nav-cta" href="https://github.com/akasumitlamba/Stype/releases" target="_blank" rel="noopener">
-          Releases
-        </a>
-        <a class="nav-cta" href="https://github.com/akasumitlamba/Stype/releases/latest" target="_blank" rel="noopener" aria-label="Download Latest" style="padding: 9px 12px; background: var(--orange); color: #fff;">
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-        </a>
+        <div class="hero-actions">
+          <a class="btn primary" href="https://github.com/akasumitlamba/Stype/releases" target="_blank" rel="noopener"
+            style="gap: 8px;">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="7 10 12 15 17 10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+            Download for Windows
+          </a>
+          <a class="btn secondary" href="https://github.com/akasumitlamba/Stype" target="_blank" rel="noopener">
+            View source
+          </a>
+        </div>
+
+        <div class="hero-stats" aria-label="Product highlights">
+          <div><strong>100%</strong><span>offline</span></div>
+          <div><strong>4</strong><span>accuracy models</span></div>
+          <div><strong>100</strong><span>local history entries</span></div>
+        </div>
       </div>
-    </header>
 
-    <main id="main">
-      <section class="hero section-band">
-        <div class="hero-copy">
-          <p class="kicker">Offline speech-to-text for Windows</p>
-          <h1>Dictation that feels built into Windows.</h1>
-          <p class="hero-lede">
-            Stype turns speech into text locally with Whisper, then pastes it wherever you are typing.
-            The new version gets a focused dashboard, a cleaner floating pill, searchable history,
-            a personal dictionary, system sound capture, and tighter engine controls.
-          </p>
-
-          <div class="hero-actions">
-            <a class="btn primary" href="https://github.com/akasumitlamba/Stype/releases" target="_blank" rel="noopener" style="gap: 8px;">
-              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-              Download for Windows
-            </a>
-            <a class="btn secondary" href="https://github.com/akasumitlamba/Stype" target="_blank" rel="noopener">
-              View source
-            </a>
+      <div class="hero-product" aria-label="Stype app preview">
+        <div class="window dashboard-window">
+          <div class="window-top">
+            <strong>Stype Dashboard</strong>
+            <span class="window-actions">
+              <span class="status-chip">Ready</span>
+              <span class="quit-chip">Quit</span>
+            </span>
           </div>
-
-          <div class="hero-stats" aria-label="Product highlights">
-            <div><strong>100%</strong><span>offline</span></div>
-            <div><strong>4</strong><span>accuracy models</span></div>
-            <div><strong>100</strong><span>local history entries</span></div>
+          <div class="tab-row">
+            <span class="active">Engine</span>
+            <span>Audio</span>
+            <span>Dictionary</span>
+            <span>History</span>
           </div>
+          <div class="field">
+            <label>Accuracy Model</label>
+            <div class="select-like">Balanced (Small)<span></span></div>
+          </div>
+          <div class="field">
+            <label>Processing Device</label>
+            <div class="select-like">CPU<span></span></div>
+          </div>
+          <button class="mock-button">Apply Reload Engine</button>
         </div>
 
-        <div class="hero-product" aria-label="Stype app preview">
-          <div class="window dashboard-window">
-            <div class="window-top">
-              <strong>Stype Dashboard</strong>
-              <span class="window-actions">
-                <span class="status-chip">Ready</span>
-                <span class="quit-chip">Quit</span>
-              </span>
-            </div>
-            <div class="tab-row">
-              <span class="active">Engine</span>
-              <span>Audio</span>
-              <span>Dictionary</span>
-              <span>History</span>
-            </div>
-            <div class="field">
-              <label>Accuracy Model</label>
-              <div class="select-like">Balanced (Small)<span></span></div>
-            </div>
-            <div class="field">
-              <label>Processing Device</label>
-              <div class="select-like">CPU<span></span></div>
-            </div>
-            <button class="mock-button">Apply Reload Engine</button>
+        <div class="floating-pill">
+          <button class="sound-toggle" aria-label="System sound input" aria-pressed="false">
+            <svg class="sound-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+              <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+              <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
+            </svg>
+          </button>
+          <div class="eq" aria-hidden="true">
+            <span></span><span></span><span></span><span></span><span></span>
           </div>
+          <strong>Listening...</strong>
+          <button aria-label="Cancel recording">x</button>
+        </div>
 
-          <div class="floating-pill">
-            <button class="sound-toggle" aria-label="System sound input" aria-pressed="false">
-              <svg class="sound-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
-                <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
-                <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
-              </svg>
-            </button>
-            <div class="eq" aria-hidden="true">
-              <span></span><span></span><span></span><span></span><span></span>
-            </div>
-            <strong>Listening...</strong>
-            <button aria-label="Cancel recording">x</button>
+        <div class="hero-shot" aria-label="Stype usage summary">
+          <div class="quick-card card-1">
+            <span>Works anywhere</span>
+            <strong>Browser, editor, email, docs</strong>
           </div>
-
-          <div class="hero-shot" aria-label="Stype usage summary">
-            <div class="quick-card card-1">
-              <span>Works anywhere</span>
-              <strong>Browser, editor, email, docs</strong>
-            </div>
-            <div class="quick-card card-2">
-              <span>Default hotkey</span>
-              <strong>Ctrl + Space</strong>
-            </div>
-            <div class="quick-card card-3">
-              <span>Data path</span>
-              <strong>Mic / system sound -> local model -> clipboard</strong>
-            </div>
+          <div class="quick-card card-2">
+            <span>Default hotkey</span>
+            <strong>Ctrl + Space</strong>
+          </div>
+          <div class="quick-card card-3">
+            <span>Data path</span>
+            <strong>Mic / system sound -> local model -> clipboard</strong>
           </div>
         </div>
-      </section>
-
-      <section id="new" class="section-band intro-grid">
-        <div>
-          <p class="kicker">New version</p>
-          <h2>A faster way to turn speech into usable text.</h2>
-        </div>
-        <div class="intro-notes">
-          <p>
-            Open Stype, press your hotkey, speak naturally, and get clean text pasted into the app you were already using.
-            The dashboard stays available for setup, while the small pill overlay handles the actual dictation flow.
-          </p>
-          <p>
-            This release adds better control over the local engine, audio input, hotkeys, system sound capture,
-            personal vocabulary, replacements, and transcription history.
-          </p>
-        </div>
-      </section>
-
-      <section class="marquee" aria-label="New feature highlights">
-        <div class="marquee-track">
-          <span>Offline Whisper engine</span>
-          <span>Engine reload controls</span>
-          <span>Mic picker</span>
-          <span>Global hotkey capture</span>
-          <span>System sound capture</span>
-          <span>Speaker pill toggle</span>
-          <span>Personal dictionary</span>
-          <span>Searchable history</span>
-          <span>Export history</span>
-          <span>Floating pill overlay</span>
-          <span>Boxy pasted tick</span>
-        </div>
-      </section>
-
-      <section id="dashboard" class="sticky-story section-band">
-        <div class="story-visual" aria-live="polite">
-          <div class="window story-window" data-story-window>
-            <div class="window-top">
-              <strong data-story-title>Engine</strong>
-              <span class="window-actions">
-                <span class="status-chip" data-story-status>Ready</span>
-                <span class="quit-chip">Quit</span>
-              </span>
-            </div>
-            <div class="tab-row">
-              <span data-tab="Engine" class="active">Engine</span>
-              <span data-tab="Audio">Audio</span>
-              <span data-tab="Dictionary">Dictionary</span>
-              <span data-tab="History">History</span>
-            </div>
-            <div class="story-panel" data-story-panel></div>
-          </div>
-        </div>
-
-        <div class="story-copy">
-          <article class="story-step is-active" data-story="engine">
-            <p class="kicker">01 - Engine</p>
-            <h2>Pick speed, accuracy, and hardware.</h2>
-            <p>
-              The Engine tab exposes Fast, Balanced, Accurate, and Best model modes,
-              plus CPU or NVIDIA CUDA processing. Applying a change reloads the engine in-app.
-            </p>
-          </article>
-
-          <article class="story-step" data-story="audio">
-            <p class="kicker">02 - Audio</p>
-            <h2>Control the microphone, hotkey, and system sound.</h2>
-            <p>
-              Choose a microphone, capture a global shortcut, or switch the hotkey to transcribe audio
-              playing from Windows with the new speaker control on the pill.
-            </p>
-          </article>
-
-          <article class="story-step" data-story="dictionary">
-            <p class="kicker">03 - Dictionary</p>
-            <h2>Teach Stype the words you actually use.</h2>
-            <p>
-              Add vocabulary terms or replacement pairs. Stype feeds those entries into the transcription prompt
-              and applies post-processing so phrases like "out words" can become "outwards".
-            </p>
-          </article>
-
-          <article class="story-step" data-story="history">
-            <p class="kicker">04 - History</p>
-            <h2>Find, copy, export, or clear transcriptions.</h2>
-            <p>
-              Every transcription is stored locally with time, word count, and character count.
-              The History tab adds search, one-click copy, import, export, and clear-all actions.
-            </p>
-          </article>
-        </div>
-      </section>
-
-      <section id="features" class="section-band feature-section">
-        <div class="section-heading">
-          <p class="kicker">What is new</p>
-          <h2>Everything useful is closer, clearer, and local.</h2>
-        </div>
-
-        <div class="feature-grid">
-          <article class="feature-card orange">
-            <span>01</span>
-            <h3>Dashboard controls</h3>
-            <p>Manage the engine, audio, dictionary, and history from one compact desktop dashboard.</p>
-          </article>
-          <article class="feature-card purple">
-            <span>02</span>
-            <h3>Floating pill overlay</h3>
-            <p>Bottom-center overlay with ready dots, live equalizer bars, processing state, cancel section, and a boxy pasted tick.</p>
-          </article>
-          <article class="feature-card yellow">
-            <span>03</span>
-            <h3>Audio automation</h3>
-            <p>Microphone picker, global hotkey capture, and system sound input with a left-side speaker toggle on the pill.</p>
-          </article>
-          <article class="feature-card green">
-            <span>04</span>
-            <h3>Personal dictionary</h3>
-            <p>Vocabulary and replacement rows help Stype recognize names, product terms, addresses, and repeated corrections.</p>
-          </article>
-          <article class="feature-card blue">
-            <span>05</span>
-            <h3>Local history workspace</h3>
-            <p>Search previous dictations, copy them back to clipboard, import old history, export a text file, or clear the local list.</p>
-          </article>
-          <article class="feature-card pink">
-            <span>06</span>
-            <h3>Faster local transcription</h3>
-            <p>Greedy beam settings, VAD filtering, local model caching, and CPU/GPU selection keep the experience responsive.</p>
-          </article>
-        </div>
-      </section>
-
-      <section class="section-band workflow">
-        <div class="section-heading">
-          <p class="kicker">How it works</p>
-          <h2>Press, speak, paste, keep moving.</h2>
-        </div>
-
-        <div class="workflow-grid">
-          <div class="flow-card">
-            <strong>1</strong>
-            <h3>Launch Stype</h3>
-            <p>The tray icon starts, the local Whisper model loads, and the dashboard can stay hidden in the background.</p>
-          </div>
-          <div class="flow-card">
-            <strong>2</strong>
-            <h3>Tap your hotkey</h3>
-            <p>The pill opens the selected input, switches to Listening, and displays blocky equalizer bars from the audio level.</p>
-          </div>
-          <div class="flow-card">
-            <strong>3</strong>
-            <h3>Finish or switch source</h3>
-            <p>Press the hotkey again, click the cancel area if needed, or use the left speaker button for system sound capture.</p>
-          </div>
-          <div class="flow-card">
-            <strong>4</strong>
-            <h3>Text appears</h3>
-            <p>Stype formats the transcript, stores it in local history, copies it, and sends Ctrl + V into the active app.</p>
-          </div>
-        </div>
-      </section>
-
-      <section id="privacy" class="section-band download-band">
-        <div style="max-width: 600px;">
-          <p class="kicker">Privacy & Architecture</p>
-          <h2>100% Local Inferencing. Zero Cloud Dependency.</h2>
-          <p>
-            Stype is engineered for absolute data sovereignty. By executing the Whisper models entirely on your local hardware, we ensure that your raw audio data, transcriptions, and personal dictionary never transit through an external server. No telemetry, no subscriptions, and zero cloud processing.
-          </p>
-        </div>
-        <a class="btn primary" href="https://github.com/akasumitlamba/Stype/releases" target="_blank" rel="noopener">
-          Get the latest release
-        </a>
-      </section>
-    </main>
-
-    <footer class="site-footer">
-      <div class="brand">
-        <span class="brand-mark" aria-hidden="true">
-          <span></span><span></span><span></span>
-        </span>
-        <span>Stype</span>
       </div>
-      <div class="footer-links">
-        <a href="https://github.com/akasumitlamba/Stype" target="_blank" rel="noopener">GitHub</a>
-        <a href="https://github.com/akasumitlamba/Stype/releases" target="_blank" rel="noopener">Releases</a>
-        <a href="https://github.com/akasumitlamba/Stype/blob/main/PRIVACY_POLICY.md" target="_blank" rel="noopener">Privacy</a>
-      </div>
-    </footer>
+    </section>
 
-    <script src="website/script.js?v=5"></script>
-  </body>
+    <section id="new" class="section-band intro-grid">
+      <div>
+        <p class="kicker">Version 2.0</p>
+        <h2>A faster way to turn speech into usable text.</h2>
+      </div>
+      <div class="intro-notes">
+        <p>
+          Open Stype, press your hotkey, speak naturally, and get clean text pasted into the app you were already using.
+          The dashboard stays available for setup, while the small pill overlay handles the actual dictation flow.
+        </p>
+        <p>
+          This release adds better control over the local engine, audio input, hotkeys, system sound capture,
+          personal vocabulary, replacements, and transcription history.
+        </p>
+      </div>
+    </section>
+
+    <section class="marquee" aria-label="New feature highlights">
+      <div class="marquee-track">
+        <span>Offline Whisper engine</span>
+        <span>Engine reload controls</span>
+        <span>Mic picker</span>
+        <span>Global hotkey capture</span>
+        <span>System sound capture</span>
+        <span>Speaker pill toggle</span>
+        <span>Personal dictionary</span>
+        <span>Searchable history</span>
+        <span>Export history</span>
+        <span>Floating pill overlay</span>
+        <span>Boxy pasted tick</span>
+      </div>
+    </section>
+
+    <section id="dashboard" class="sticky-story section-band">
+      <div class="story-visual" aria-live="polite">
+        <div class="window story-window" data-story-window>
+          <div class="window-top">
+            <strong data-story-title>Engine</strong>
+            <span class="window-actions">
+              <span class="status-chip" data-story-status>Ready</span>
+              <span class="quit-chip">Quit</span>
+            </span>
+          </div>
+          <div class="tab-row">
+            <span data-tab="Engine" class="active">Engine</span>
+            <span data-tab="Audio">Audio</span>
+            <span data-tab="Dictionary">Dictionary</span>
+            <span data-tab="History">History</span>
+          </div>
+          <div class="story-panel" data-story-panel></div>
+        </div>
+      </div>
+
+      <div class="story-copy">
+        <article class="story-step is-active" data-story="engine">
+          <p class="kicker">01 - Engine</p>
+          <h2>Pick speed, accuracy, and hardware.</h2>
+          <p>
+            The Engine tab exposes Fast, Balanced, Accurate, and Best model modes,
+            plus CPU or NVIDIA CUDA processing. Applying a change reloads the engine in-app.
+          </p>
+        </article>
+
+        <article class="story-step" data-story="audio">
+          <p class="kicker">02 - Audio</p>
+          <h2>Control the microphone, hotkey, and system sound.</h2>
+          <p>
+            Choose a microphone, capture a global shortcut, or switch the hotkey to transcribe audio
+            playing from Windows with the new speaker control on the pill.
+          </p>
+        </article>
+
+        <article class="story-step" data-story="dictionary">
+          <p class="kicker">03 - Dictionary</p>
+          <h2>Teach Stype the words you actually use.</h2>
+          <p>
+            Add vocabulary terms or replacement pairs. Stype feeds those entries into the transcription prompt
+            and applies post-processing so phrases like "out words" can become "outwards".
+          </p>
+        </article>
+
+        <article class="story-step" data-story="history">
+          <p class="kicker">04 - History</p>
+          <h2>Find, copy, export, or clear transcriptions.</h2>
+          <p>
+            Every transcription is stored locally with time, word count, and character count.
+            The History tab adds search, one-click copy, import, export, and clear-all actions.
+          </p>
+        </article>
+      </div>
+    </section>
+
+    <section id="features" class="section-band feature-section">
+      <div class="section-heading">
+        <p class="kicker">What is new</p>
+        <h2>Everything useful is closer, clearer, and local.</h2>
+      </div>
+
+      <div class="feature-grid">
+        <article class="feature-card orange">
+          <span>01</span>
+          <h3>Dashboard controls</h3>
+          <p>Manage the engine, audio, dictionary, and history from one compact desktop dashboard.</p>
+        </article>
+        <article class="feature-card purple">
+          <span>02</span>
+          <h3>Floating pill overlay</h3>
+          <p>Bottom-center overlay with ready dots, live equalizer bars, processing state, cancel section, and a boxy
+            pasted tick.</p>
+        </article>
+        <article class="feature-card yellow">
+          <span>03</span>
+          <h3>Audio automation</h3>
+          <p>Microphone picker, global hotkey capture, and system sound input with a left-side speaker toggle on the
+            pill.</p>
+        </article>
+        <article class="feature-card green">
+          <span>04</span>
+          <h3>Personal dictionary</h3>
+          <p>Vocabulary and replacement rows help Stype recognize names, product terms, addresses, and repeated
+            corrections.</p>
+        </article>
+        <article class="feature-card blue">
+          <span>05</span>
+          <h3>Local history workspace</h3>
+          <p>Search previous dictations, copy them back to clipboard, import old history, export a text file, or clear
+            the local list.</p>
+        </article>
+        <article class="feature-card pink">
+          <span>06</span>
+          <h3>Faster local transcription</h3>
+          <p>Greedy beam settings, VAD filtering, local model caching, and CPU/GPU selection keep the experience
+            responsive.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section-band workflow">
+      <div class="section-heading">
+        <p class="kicker">How it works</p>
+        <h2>Press, speak, paste, keep moving.</h2>
+      </div>
+
+      <div class="workflow-grid">
+        <div class="flow-card">
+          <strong>1</strong>
+          <h3>Launch Stype</h3>
+          <p>The tray icon starts, the local Whisper model loads, and the dashboard can stay hidden in the background.
+          </p>
+        </div>
+        <div class="flow-card">
+          <strong>2</strong>
+          <h3>Tap your hotkey</h3>
+          <p>The pill opens the selected input, switches to Listening, and displays blocky equalizer bars from the audio
+            level.</p>
+        </div>
+        <div class="flow-card">
+          <strong>3</strong>
+          <h3>Finish or switch source</h3>
+          <p>Press the hotkey again, click the cancel area if needed, or use the left speaker button for system sound
+            capture.</p>
+        </div>
+        <div class="flow-card">
+          <strong>4</strong>
+          <h3>Text appears</h3>
+          <p>Stype formats the transcript, stores it in local history, copies it, and sends Ctrl + V into the active
+            app.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="privacy" class="section-band download-band">
+      <div style="max-width: 600px;">
+        <p class="kicker">Privacy & Architecture</p>
+        <h2>100% Local Inferencing. Zero Cloud Dependency.</h2>
+        <p>
+          Stype is engineered for absolute data sovereignty. By executing the Whisper models entirely on your local
+          hardware, we ensure that your raw audio data, transcriptions, and personal dictionary never transit through an
+          external server. No telemetry, no subscriptions, and zero cloud processing.
+        </p>
+      </div>
+      <a class="btn primary" href="https://github.com/akasumitlamba/Stype/releases" target="_blank" rel="noopener">
+        Get the latest release
+      </a>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">
+        <span></span><span></span><span></span>
+      </span>
+      <span>Stype</span>
+    </div>
+    <div class="footer-links">
+      <a href="https://github.com/akasumitlamba" target="_blank" rel="noopener"
+        style="font-weight: 950; color: #fff;">Created by Sumit Kumar Lamba</a>
+      <a href="https://github.com/akasumitlamba/Stype" target="_blank" rel="noopener">GitHub</a>
+      <a href="https://github.com/akasumitlamba/Stype/releases" target="_blank" rel="noopener">Releases</a>
+      <a href="https://github.com/akasumitlamba/Stype/blob/main/PRIVACY_POLICY.md" target="_blank"
+        rel="noopener">Privacy</a>
+    </div>
+  </footer>
+
+  <script src="website/script.js?v=5"></script>
+</body>
+
 </html>
