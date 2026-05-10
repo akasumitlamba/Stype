@@ -1818,6 +1818,11 @@ class StypeEngine:
         self._pasted_timer.setSingleShot(True)
         self._pasted_timer.timeout.connect(lambda: self._emit_state("ready"))
 
+        # Safety timeout: if processing hangs for >15s, force-cancel
+        self._processing_timeout = QTimer()
+        self._processing_timeout.setSingleShot(True)
+        self._processing_timeout.timeout.connect(self._on_processing_timeout)
+
         # Stream is created on demand
         
         # Hotkey setup
@@ -1996,6 +2001,7 @@ class StypeEngine:
         process_id = self._current_process_id
         self._emit_state("processing")
         self.tray_icon.setToolTip("Stype — Processing...")
+        self._processing_timeout.start(15000)  # 15 second safety net
         threading.Thread(target=self._process, args=(process_id,), daemon=True).start()
 
     def _finish_recording(self, process_if_speech=True):
@@ -2036,19 +2042,24 @@ class StypeEngine:
             self.audio_frames_sys.append(chunk)
 
     def _cancel(self):
+        self._processing_timeout.stop()
         if self.recording:
             self._finish_recording(process_if_speech=False)
-            self.tray_icon.setToolTip("Stype — Ready")
-        # Always handle processing state, even if we just stopped recording
-        if self.processing:
-            self.cancelled = True
-            self._current_process_id += 1
-            self.processing = False
-            self.audio_frames_mic = []
-            self.audio_frames_sys = []
-            # Force the pill to "ready" directly via signal, bypassing _emit_state guard
-            self.signals.state_changed.emit("ready")
-            self.tray_icon.setToolTip("Stype — Ready")
+        # Always force-reset processing state
+        self.cancelled = True
+        self._current_process_id += 1
+        self.recording = False
+        self.processing = False
+        self.audio_frames_mic = []
+        self.audio_frames_sys = []
+        # Force the pill to "ready" directly via signal, bypassing _emit_state guard
+        self.signals.state_changed.emit("ready")
+        self.tray_icon.setToolTip("Stype — Ready")
+
+    def _on_processing_timeout(self):
+        """Auto-cancel if processing takes longer than 15 seconds."""
+        print("[Stype] Processing timeout — force-cancelling.")
+        self._cancel()
 
     def _toggle_system_audio(self):
         if not self.recording:
@@ -2154,10 +2165,11 @@ class StypeEngine:
                 self.tray_icon.setToolTip("Stype — Ready")
             return
 
-        # Check if audio is pure silence (RMS < threshold)
+        # Check if audio is near-silence / background noise (RMS < threshold)
         rms = np.sqrt(np.mean(mixed_audio ** 2))
-        if rms < 0.005:
+        if rms < 0.03:
             if process_id == self._current_process_id:
+                self._processing_timeout.stop()
                 self.processing = False
                 self._emit_state("ready")
                 self.tray_icon.setToolTip("Stype — Ready")
@@ -2209,6 +2221,7 @@ class StypeEngine:
                 final_text = post_process(raw_text)
                 self.signals.transcription_done.emit(final_text, process_id)
             elif process_id == self._current_process_id:
+                self._processing_timeout.stop()
                 self._emit_state("ready")
                 self.tray_icon.setToolTip("Stype — Ready")
                 self.processing = False
@@ -2216,10 +2229,12 @@ class StypeEngine:
         except Exception as e:
             print(f"[Stype] Transcription error: {e}")
             if process_id == self._current_process_id:
+                self._processing_timeout.stop()
                 self._emit_state("ready")
                 self.processing = False
 
     def _on_transcription(self, text, process_id):
+        self._processing_timeout.stop()
         if self.cancelled or process_id != self._current_process_id:
             return
 
