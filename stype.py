@@ -44,7 +44,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import (
     Qt, pyqtSignal, pyqtProperty, QObject, QTimer, QPropertyAnimation,
-    QRect, QPoint, QSharedMemory, QEasingCurve
+    QRect, QPoint, QEasingCurve
 )
 from PyQt6.QtGui import (
     QFont, QColor, QPainter, QPen, QBrush,
@@ -937,7 +937,9 @@ class PillOverlay(QWidget):
     def mouseReleaseEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton and not self._drag_moved:
             w = self.width()
-            if self._system_audio_enabled and event.pos().x() <= self._system_button_w() + 4:
+            icon_w = self._system_button_w()
+            # Only intercept speaker clicks when the icon is actually visible
+            if icon_w > 0 and event.pos().x() <= icon_w + 4:
                 self.clicked_system_audio.emit()
             # If clicked on X button during active states
             elif self._state in ["listening", "starting_mic", "starting_system", "processing"] and event.pos().x() > w - 34:
@@ -1406,7 +1408,6 @@ class MainWindow(QMainWindow):
         self.launch_startup_cb = ToggleSwitch()
         startup_enabled = bool(data_manager.get("launch_on_startup")) or is_launch_on_startup_enabled()
         self.launch_startup_cb.setChecked(startup_enabled)
-        self.launch_startup_cb.toggled.connect(self._on_startup_toggled)
         startup_row.addWidget(self.launch_startup_cb)
         startup_row.addWidget(QLabel("Start Stype when Windows signs in"))
         startup_row.addStretch()
@@ -1666,21 +1667,17 @@ class MainWindow(QMainWindow):
         device = "cuda" if "GPU" in self.device_combo.currentText() else "cpu"
         data_manager.set("model", model_name)
         data_manager.set("device", self.device_combo.currentText())
-        self.model_changed.emit(model_id, device)
 
-    def _on_startup_toggled(self, checked):
-        launch_on_startup = bool(checked)
+        # Apply startup setting only on explicit save
+        launch_on_startup = self.launch_startup_cb.isChecked()
         data_manager.set("launch_on_startup", launch_on_startup)
-        if set_launch_on_startup(launch_on_startup):
-            self.status_label.setText("Startup Saved")
-            self.status_label.setStyleSheet(f"color: white; background: {NB_GREEN}; padding: 4px 10px; border: 2px solid {NB_BORDER};")
-        else:
+        if not set_launch_on_startup(launch_on_startup):
             data_manager.set("launch_on_startup", not launch_on_startup)
             self.launch_startup_cb.blockSignals(True)
             self.launch_startup_cb.setChecked(not launch_on_startup)
             self.launch_startup_cb.blockSignals(False)
-            self.status_label.setText("Startup Failed")
-            self.status_label.setStyleSheet(f"color: white; background: {NB_PINK}; padding: 4px 10px; border: 2px solid {NB_BORDER};")
+
+        self.model_changed.emit(model_id, device)
 
     def _on_system_audio_toggled(self, checked):
         self._on_save_audio()
@@ -1844,7 +1841,7 @@ class StypeEngine:
 
         tray_menu.addSeparator()
         quit_action = QAction("Quit Completely", qapp)
-        quit_action.triggered.connect(qapp.quit)
+        quit_action.triggered.connect(self._quit_app)
         tray_menu.addAction(quit_action)
 
         self.tray_icon.setContextMenu(tray_menu)
@@ -1859,6 +1856,28 @@ class StypeEngine:
         saved_device = data_manager.get("device")
         device = "cuda" if "GPU" in saved_device else "cpu"
         threading.Thread(target=self._load_model, args=(model_id, device), daemon=True).start()
+
+    def _quit_app(self):
+        """Forcefully clean up everything and quit."""
+        try:
+            self.recording = False
+            self.processing = True  # prevent re-entry
+            self.cancelled = True
+            self._current_process_id += 100
+            self._stop_mic_stream()
+            self._stop_system_stream()
+            if self._current_hotkey:
+                try:
+                    keyboard.remove_hotkey(self._current_hotkey)
+                except Exception:
+                    pass
+                self._current_hotkey = None
+            self.tray_icon.hide()
+            self.pill.hide()
+            self.dashboard.close()
+        except Exception:
+            pass
+        QApplication.instance().quit()
 
     def _emit_state(self, state_key):
         if state_key == "ready":
@@ -2020,13 +2039,15 @@ class StypeEngine:
         if self.recording:
             self._finish_recording(process_if_speech=False)
             self.tray_icon.setToolTip("Stype — Ready")
-        elif self.processing:
+        # Always handle processing state, even if we just stopped recording
+        if self.processing:
             self.cancelled = True
+            self._current_process_id += 1
             self.processing = False
             self.audio_frames_mic = []
             self.audio_frames_sys = []
-            self._current_process_id += 1
-            self._emit_state("ready")
+            # Force the pill to "ready" directly via signal, bypassing _emit_state guard
+            self.signals.state_changed.emit("ready")
             self.tray_icon.setToolTip("Stype — Ready")
 
     def _toggle_system_audio(self):
@@ -2114,12 +2135,28 @@ class StypeEngine:
         audio_data_sys = resample_audio(audio_data_sys, sample_rate)
         
         max_len = max(len(audio_data_mic), len(audio_data_sys))
+        if max_len == 0:
+            if process_id == self._current_process_id:
+                self.processing = False
+                self._emit_state("ready")
+                self.tray_icon.setToolTip("Stype — Ready")
+            return
+
         mixed_audio = np.zeros(max_len, dtype=np.float32)
         if len(audio_data_mic) > 0: mixed_audio[:len(audio_data_mic)] += audio_data_mic
         if len(audio_data_sys) > 0: mixed_audio[:len(audio_data_sys)] += audio_data_sys
 
-        # Prevent VAD filter crash/hang on micro-recordings
+        # Prevent VAD filter crash/hang on micro-recordings or pure silence
         if len(mixed_audio) < sample_rate * 0.5:
+            if process_id == self._current_process_id:
+                self.processing = False
+                self._emit_state("ready")
+                self.tray_icon.setToolTip("Stype — Ready")
+            return
+
+        # Check if audio is pure silence (RMS < threshold)
+        rms = np.sqrt(np.mean(mixed_audio ** 2))
+        if rms < 0.005:
             if process_id == self._current_process_id:
                 self.processing = False
                 self._emit_state("ready")
@@ -2212,13 +2249,25 @@ class StypeEngine:
 
 
 if __name__ == "__main__":
+    # Single-instance enforcement using Windows named mutex
+    _mutex_handle = None
+    if os.name == "nt":
+        import ctypes
+        _mutex_handle = ctypes.windll.kernel32.CreateMutexW(None, True, "Global\\StypeVoiceDictation_SingleInstance_v2")
+        if ctypes.windll.kernel32.GetLastError() == 183:  # ERROR_ALREADY_EXISTS
+            print("[Stype] Another instance is already running.")
+            ctypes.windll.kernel32.CloseHandle(_mutex_handle)
+            sys.exit(0)
+
     app = QApplication(sys.argv)
-
-    shared_mem = QSharedMemory("StypeVoiceDictationLockID_v1")
-    if not shared_mem.create(1):
-        print("[Stype] Another instance is already running! Exiting immediately to prevent double pasting.")
-        sys.exit(0)
-
     app.setQuitOnLastWindowClosed(False)
     engine = StypeEngine()
-    sys.exit(app.exec())
+    exit_code = app.exec()
+
+    # Release mutex on exit
+    if _mutex_handle and os.name == "nt":
+        import ctypes
+        ctypes.windll.kernel32.ReleaseMutex(_mutex_handle)
+        ctypes.windll.kernel32.CloseHandle(_mutex_handle)
+
+    sys.exit(exit_code)
