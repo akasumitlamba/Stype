@@ -477,6 +477,7 @@ class BrutalComboBox(QComboBox):
 class Signals(QObject):
     state_changed = pyqtSignal(str)          
     transcription_done = pyqtSignal(str, int)
+    ready_reset = pyqtSignal()  # thread-safe "go back to ready" signal
 
 def post_process(text: str) -> str:
     text = text.strip()
@@ -622,7 +623,7 @@ class PillOverlay(QWidget):
                 border: 2px solid {NB_BORDER};
                 color: {NB_INK};
                 padding: 4px;
-                font-family: 'Inter', 'Segoe UI', sans-serif;
+                font-family: 'Segoe UI', sans-serif;
                 font-weight: 600;
             }}
             QMenu::item {{
@@ -904,8 +905,7 @@ class PillOverlay(QWidget):
                 p.drawEllipse(QPoint(dot_x, dot_y), 5, 5)
 
             # Text label — bold and dark
-            font = QFont("Inter", 8, QFont.Weight.Bold)
-            if not font.exactMatch(): font = QFont("Segoe UI", 8, QFont.Weight.Bold)
+            font = QFont("Segoe UI", 8, QFont.Weight.Bold)
             p.setFont(font)
             p.setPen(QColor(NB_INK))
             label = state["label"]
@@ -975,7 +975,7 @@ class HistoryItem(QFrame):
             }}
             QLabel {{
                 color: {NB_INK};
-                font-family: 'Inter', 'Segoe UI', sans-serif;
+                font-family: 'Segoe UI', sans-serif;
                 font-size: 13px;
                 background: transparent;
                 border: none;
@@ -1003,7 +1003,7 @@ class HistoryItem(QFrame):
                 border: 2px solid {NB_BORDER};
                 padding: 10px;
                 color: {NB_INK};
-                font-family: 'Inter', 'Segoe UI', sans-serif;
+                font-family: 'Segoe UI', sans-serif;
                 font-size: 13px;
             }}
         """)
@@ -1168,7 +1168,7 @@ class MainWindow(QMainWindow):
 
         self.setStyleSheet(f"""
             * {{
-                font-family: 'Inter', 'Segoe UI', sans-serif;
+                font-family: 'Segoe UI', sans-serif;
             }}
             QWidget {{
                 color: {NB_INK};
@@ -1352,12 +1352,12 @@ class MainWindow(QMainWindow):
         header = QHBoxLayout()
         header.setSpacing(8)
         title = QLabel("Stype Dashboard")
-        title.setFont(QFont("Inter", 18, QFont.Weight.ExtraBold))
+        title.setFont(QFont("Segoe UI", 18, QFont.Weight.ExtraBold))
         header.addWidget(title)
         header.addStretch()
         self.status_label = QLabel("Loading Model...")
         self.status_label.setObjectName("status_label")
-        self.status_label.setFont(QFont("Inter", 11, QFont.Weight.Bold))
+        self.status_label.setFont(QFont("Segoe UI", 11, QFont.Weight.Bold))
         self.status_label.setStyleSheet(f"color: {NB_YELLOW}; background: {NB_INK}; padding: 4px 10px; border: 2px solid {NB_BORDER};")
         header.addWidget(self.status_label)
         quit_btn = QPushButton("⏻ Quit")
@@ -1806,7 +1806,9 @@ class StypeEngine:
         self.dashboard.settings_changed.connect(self._on_settings_changed)
         self.signals.state_changed.connect(self.pill.set_state)
         self.signals.state_changed.connect(self.dashboard.update_status)
+        self.signals.state_changed.connect(self._update_tray_tooltip)
         self.signals.transcription_done.connect(self._on_transcription)
+        self.signals.ready_reset.connect(self._on_ready_reset)
         
         self.pill.clicked_toggle.connect(self._toggle)
         self.pill.clicked_cancel.connect(self._cancel)
@@ -1883,6 +1885,23 @@ class StypeEngine:
         except Exception:
             pass
         QApplication.instance().quit()
+
+    def _update_tray_tooltip(self, state_key):
+        tooltips = {
+            "ready": "Stype — Ready",
+            "loading": "Stype — Loading Model...",
+            "listening": "Stype — Recording...",
+            "starting_mic": "Stype — Opening Mic...",
+            "starting_system": "Stype — Opening System Sound...",
+            "processing": "Stype — Processing...",
+            "pasted": "Stype — Ready",
+        }
+        self.tray_icon.setToolTip(tooltips.get(state_key, "Stype"))
+
+    def _on_ready_reset(self):
+        """Thread-safe handler: resets processing state from the main thread."""
+        self.processing = False
+        self._emit_state("ready")
 
     def _emit_state(self, state_key):
         if state_key == "ready":
@@ -2085,7 +2104,6 @@ class StypeEngine:
         if not self.recording:
             self.pill.set_capture_source("microphone")
             self._emit_state("starting_mic")
-            self.tray_icon.setToolTip("Stype — Opening Mic...")
             self._reset_recording_state()
             threading.Thread(target=self._init_audio_and_record, daemon=True).start()
         else:
@@ -2096,10 +2114,8 @@ class StypeEngine:
         if hasattr(self, 'stream') and self.stream is not None:
             self.recording = True
             self._emit_state("listening")
-            self.tray_icon.setToolTip("Stype — Recording...")
         else:
             self._emit_state("ready")
-            self.tray_icon.setToolTip("Stype — Ready")
 
     def _load_model(self, model_id, device):
         self._emit_state("loading")
@@ -2114,7 +2130,6 @@ class StypeEngine:
                 download_root=os.path.join(DATA_DIR, "whisper_model")
             )
             self._emit_state("ready")
-            self.tray_icon.setToolTip("Stype — Ready")
         except Exception as e:
             print(f"[Stype] Model load error: {e}")
             self._emit_state("ready")
@@ -2129,9 +2144,7 @@ class StypeEngine:
 
         if not self.audio_frames_mic and not self.audio_frames_sys:
             if process_id == self._current_process_id:
-                self.processing = False
-                self._emit_state("ready")
-            self.tray_icon.setToolTip("Stype — Ready")
+                self.signals.ready_reset.emit()
             return
 
         sample_rate = self._audio_sample_rate
@@ -2148,9 +2161,7 @@ class StypeEngine:
         max_len = max(len(audio_data_mic), len(audio_data_sys))
         if max_len == 0:
             if process_id == self._current_process_id:
-                self.processing = False
-                self._emit_state("ready")
-                self.tray_icon.setToolTip("Stype — Ready")
+                self.signals.ready_reset.emit()
             return
 
         mixed_audio = np.zeros(max_len, dtype=np.float32)
@@ -2160,19 +2171,14 @@ class StypeEngine:
         # Prevent VAD filter crash/hang on micro-recordings or pure silence
         if len(mixed_audio) < sample_rate * 0.5:
             if process_id == self._current_process_id:
-                self.processing = False
-                self._emit_state("ready")
-                self.tray_icon.setToolTip("Stype — Ready")
+                self.signals.ready_reset.emit()
             return
 
-        # Check if audio is near-silence / background noise (RMS < threshold)
+        # Check if audio is near-silence (RMS < threshold)
         rms = np.sqrt(np.mean(mixed_audio ** 2))
-        if rms < 0.03:
+        if rms < 0.008:
             if process_id == self._current_process_id:
-                self._processing_timeout.stop()
-                self.processing = False
-                self._emit_state("ready")
-                self.tray_icon.setToolTip("Stype — Ready")
+                self.signals.ready_reset.emit()
             return
 
         try:
@@ -2190,9 +2196,9 @@ class StypeEngine:
             if vocab:
                 prompt += " Vocabulary: " + ", ".join(list(set(vocab))[:50])
             transcribe_kwargs = dict(
-                beam_size=1,            # 1 is much faster (greedy search), 5 is for high accuracy
-                vad_filter=True,        # Enable VAD filter to ignore silence
-                vad_parameters=dict(min_silence_duration_ms=500), # Aggressive VAD
+                beam_size=5,
+                vad_filter=True,
+                vad_parameters=dict(min_silence_duration_ms=500),
                 condition_on_previous_text=False,
                 initial_prompt=prompt,
                 language="en"
@@ -2206,12 +2212,11 @@ class StypeEngine:
 
             raw_text = "".join([s.text for s in segments]).strip()
 
-            # Anti-hallucination check: Whisper sometimes regurgitates the prompt on silence
-            if prompt and raw_text:
-                import re
+            # Anti-hallucination: only filter if output is VERY short and matches prompt exactly
+            if prompt and raw_text and len(raw_text.split()) <= 5:
                 clean_raw = re.sub(r'[^\w\s]', '', raw_text.lower()).strip()
                 clean_prompt = re.sub(r'[^\w\s]', '', prompt.lower()).strip()
-                if clean_raw in clean_prompt or clean_prompt in clean_raw:
+                if clean_raw and clean_raw in clean_prompt:
                     raw_text = ""
 
             if self.cancelled or process_id != self._current_process_id:
@@ -2221,17 +2226,12 @@ class StypeEngine:
                 final_text = post_process(raw_text)
                 self.signals.transcription_done.emit(final_text, process_id)
             elif process_id == self._current_process_id:
-                self._processing_timeout.stop()
-                self._emit_state("ready")
-                self.tray_icon.setToolTip("Stype — Ready")
-                self.processing = False
+                self.signals.ready_reset.emit()
 
         except Exception as e:
             print(f"[Stype] Transcription error: {e}")
             if process_id == self._current_process_id:
-                self._processing_timeout.stop()
-                self._emit_state("ready")
-                self.processing = False
+                self.signals.ready_reset.emit()
 
     def _on_transcription(self, text, process_id):
         self._processing_timeout.stop()
