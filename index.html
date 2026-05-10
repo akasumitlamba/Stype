@@ -8,7 +8,7 @@
       name="description"
       content="Stype is a private offline speech-to-text app for Windows with a new dashboard, floating pill overlay, personal dictionary, history, hotkeys, and local Whisper transcription."
     />
-    <link rel="stylesheet" href="website/style.css?v=5" />
+    <link rel="stylesheet" href="website/style.css?v=16" />
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to content</a>
@@ -28,9 +28,14 @@
         <a href="#privacy">Privacy</a>
       </nav>
 
-      <a class="nav-cta" href="https://github.com/akasumitlamba/Stype/releases" target="_blank" rel="noopener">
-        Releases
-      </a>
+      <div style="display: flex; gap: 12px;">
+        <a class="nav-cta" href="https://github.com/akasumitlamba/Stype/releases" target="_blank" rel="noopener">
+          Releases
+        </a>
+        <a class="nav-cta" href="https://github.com/akasumitlamba/Stype/releases/latest" target="_blank" rel="noopener" aria-label="Download Latest" style="padding: 9px 12px; background: var(--orange); color: #fff;">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+        </a>
+      </div>
     </header>
 
     <main id="main">
@@ -45,7 +50,8 @@
           </p>
 
           <div class="hero-actions">
-            <a class="btn primary" href="https://github.com/akasumitlamba/Stype/releases" target="_blank" rel="noopener">
+            <a class="btn primary" href="https://github.com/akasumitlamba/Stype/releases" target="_blank" rel="noopener" style="gap: 8px;">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
               Download for Windows
             </a>
             <a class="btn secondary" href="https://github.com/akasumitlamba/Stype" target="_blank" rel="noopener">
@@ -55,7 +61,7 @@
 
           <div class="hero-stats" aria-label="Product highlights">
             <div><strong>100%</strong><span>offline</span></div>
-            <div><strong>4 models</strong></div>
+            <div><strong>4</strong><span>accuracy models</span></div>
             <div><strong>100</strong><span>local history entries</span></div>
           </div>
         </div>
@@ -88,7 +94,11 @@
 
           <div class="floating-pill">
             <button class="sound-toggle" aria-label="System sound input" aria-pressed="false">
-              <span class="sound-icon" aria-hidden="true"></span>
+              <svg class="sound-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+                <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
+              </svg>
             </button>
             <div class="eq" aria-hidden="true">
               <span></span><span></span><span></span><span></span><span></span>
@@ -97,18 +107,18 @@
             <button aria-label="Cancel recording">x</button>
           </div>
 
-          <div class="hero-shot quick-panel" aria-label="Stype usage summary">
-            <div>
+          <div class="hero-shot" aria-label="Stype usage summary">
+            <div class="quick-card card-1">
               <span>Works anywhere</span>
               <strong>Browser, editor, email, docs</strong>
             </div>
-            <div>
+            <div class="quick-card card-2">
               <span>Default hotkey</span>
               <strong>Ctrl + Space</strong>
             </div>
-            <div>
+            <div class="quick-card card-3">
               <span>Data path</span>
-              <strong>Mic or system sound -> local model -> clipboard</strong>
+              <strong>Mic / system sound -> local model -> clipboard</strong>
             </div>
           </div>
         </div>
@@ -277,11 +287,11 @@
       </section>
 
       <section id="privacy" class="section-band download-band">
-        <div>
-          <p class="kicker">Private by default</p>
-          <h2>No account. No subscriptions. No cloud audio.</h2>
+        <div style="max-width: 600px;">
+          <p class="kicker">Privacy & Architecture</p>
+          <h2>100% Local Inferencing. Zero Cloud Dependency.</h2>
           <p>
-            Stype runs the model locally, stores settings locally, and keeps your dictated text on your Windows machine.
+            Stype is engineered for absolute data sovereignty. By executing the Whisper models entirely on your local hardware, we ensure that your raw audio data, transcriptions, and personal dictionary never transit through an external server. No telemetry, no subscriptions, and zero cloud processing.
           </p>
         </div>
         <a class="btn primary" href="https://github.com/akasumitlamba/Stype/releases" target="_blank" rel="noopener">
