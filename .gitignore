@@ -34,3 +34,9 @@ Thumbs.db
 
 # App Data
 stype_data.json
+
+# Installer output — never commit the built setup exe
+installer_output/
+
+# Log files
+*.log
