@@ -19,6 +19,40 @@ import sounddevice as sd
 import keyboard
 import pyperclip
 import shutil
+import logging
+
+# ═══════════════════════════════════════════════════════════
+#  PATH & LOGGING SETUP
+# ═══════════════════════════════════════════════════════════
+if getattr(sys, "frozen", False):
+    # Running as a packaged exe
+    APP_DIR = os.path.dirname(sys.executable)
+    USER_DATA_DIR = os.path.join(os.environ.get("APPDATA", os.path.expanduser("~")), "Stype")
+else:
+    # Running as a script
+    APP_DIR = os.path.dirname(os.path.abspath(__file__))
+    USER_DATA_DIR = APP_DIR
+
+os.makedirs(USER_DATA_DIR, exist_ok=True)
+
+# Define file paths
+DATA_FILE = os.path.join(USER_DATA_DIR, "stype_data.json")
+LOG_FILE = os.path.join(USER_DATA_DIR, "stype.log")
+
+# Setup logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[
+        logging.FileHandler(LOG_FILE, encoding="utf-8"),
+        logging.StreamHandler(sys.stdout)
+    ]
+)
+logger = logging.getLogger("Stype")
+logger.info(f"Starting Stype (Frozen: {getattr(sys, 'frozen', False)})")
+logger.info(f"APP_DIR: {APP_DIR}")
+logger.info(f"USER_DATA_DIR: {USER_DATA_DIR}")
+
 
 # ═══════════════════════════════════════════════════════════
 # WINDOWS SYMLINK FIX
@@ -65,8 +99,8 @@ FORMATTING_PROMPT = (
 # ═══════════════════════════════════════════════════════════
 #  DATA MANAGER (Persistence & Learning)
 # ═══════════════════════════════════════════════════════════
-DATA_DIR = os.path.dirname(os.path.abspath(__file__))
-DATA_FILE = os.path.join(DATA_DIR, "stype_data.json")
+# DATA_DIR and DATA_FILE are now defined in PATH SETUP above
+
 
 DEFAULT_SETTINGS = {
     "hotkey": "ctrl+space",
@@ -118,14 +152,16 @@ class DataManager:
                     for k, v in DEFAULT_SETTINGS.items():
                         self.data["settings"][k] = saved_settings.get(k, v)
             except Exception as e:
-                print(f"[Stype] Error loading data: {e}")
+                logger.error(f"Error loading data: {e}")
+
 
     def save(self):
         try:
             with open(DATA_FILE, 'w') as f:
                 json.dump(self.data, f, indent=4)
         except Exception as e:
-            print(f"[Stype] Error saving data: {e}")
+            logger.error(f"Error saving data: {e}")
+
 
     def get(self, key):
         return self.data["settings"].get(key, DEFAULT_SETTINGS.get(key))
@@ -135,7 +171,6 @@ class DataManager:
         self.save()
 
     def add_history(self, text):
-        import datetime
         entry = {"text": text, "time": datetime.datetime.now().isoformat()}
         self.data["history"].insert(0, entry)
         if len(self.data["history"]) > 100:
@@ -213,8 +248,9 @@ class DataManager:
             self.save()
             return len(merged)
         except Exception as e:
-            print(f"[Stype] Error importing history: {e}")
+            logger.error(f"Error importing history: {e}")
             return 0
+
 
 data_manager = DataManager()
 
@@ -264,8 +300,9 @@ def set_launch_on_startup(enabled):
                     pass
         return True
     except OSError as e:
-        print(f"[Stype] Startup setting failed: {e}")
+        logger.error(f"Startup setting failed: {e}")
         return False
+
 
 def _clean_device_name(name):
     return re.sub(r"\s+", " ", str(name).replace("\r", " ").replace("\n", " ")).strip()
@@ -355,7 +392,8 @@ class SystemAudioStream:
                     if data is not None and len(data) > 0:
                         self.callback(data, len(data), None, None)
         except Exception as e:
-            print(f"[Stype] System audio error: {e}")
+            logger.error(f"System audio error: {e}")
+
 
     def stop(self):
         self.running = False
@@ -419,8 +457,8 @@ class ToggleSwitch(QAbstractButton):
         self.setCheckable(True)
         self.setFixedSize(38, 20)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
-        self._pos = 2
-        self._anim = QPropertyAnimation(self, b"pos")
+        self._thumb_pos = 2
+        self._anim = QPropertyAnimation(self, b"thumb_pos")
         self._anim.setDuration(120)
         self._anim.setEasingCurve(QEasingCurve.Type.InOutQuad)
         self.toggled.connect(self._animate_state)
@@ -431,10 +469,10 @@ class ToggleSwitch(QAbstractButton):
         self._anim.start()
 
     @pyqtProperty(int)
-    def pos(self): return self._pos
-    @pos.setter
-    def pos(self, p):
-        self._pos = p
+    def thumb_pos(self): return self._thumb_pos
+    @thumb_pos.setter
+    def thumb_pos(self, p):
+        self._thumb_pos = p
         self.update()
 
     def setChecked(self, checked):
@@ -456,7 +494,7 @@ class ToggleSwitch(QAbstractButton):
         # Thumb — white circle with black border
         p.setPen(QPen(QColor(NB_BORDER), 1.5))
         p.setBrush(QColor("#ffffff"))
-        p.drawEllipse(self._pos, 2, 16, 16)
+        p.drawEllipse(self._thumb_pos, 2, 16, 16)
         p.end()
 
 
@@ -585,6 +623,7 @@ class PillOverlay(QWidget):
         self._drag_pos = None
         self._drag_moved = False
         self._audio_level = 0.0  # 0.0 – 1.0
+        self._smoothed_level = 0.0  # initialized here to avoid lazy-init in paintEvent
         self._rec_start = None
         self._manually_hidden = False
         self._system_audio_enabled = False
@@ -859,7 +898,6 @@ class PillOverlay(QWidget):
                     p.setPen(QPen(QColor(NB_BORDER), 1.0))
                     p.drawRect(bx, by, bar_w, heights[i])
             else:
-                if not hasattr(self, '_smoothed_level'): self._smoothed_level = 0.0
                 self._smoothed_level += (self._audio_level - self._smoothed_level) * 0.35
                 
                 max_h = h - 10
@@ -1659,10 +1697,10 @@ class MainWindow(QMainWindow):
             self._engine_ref._register_hotkey(hotkey)
 
     def _on_apply(self):
-        model_name = self.model_combo.currentText()
-        model_id = MODELS[model_name]
+        # Model is fixed to small.en — no model_combo widget exists
+        model_id = "small.en"
         device = "cuda" if "GPU" in self.device_combo.currentText() else "cpu"
-        data_manager.set("model", model_name)
+        data_manager.set("model", "small.en")
         data_manager.set("device", self.device_combo.currentText())
 
         # Apply startup setting only on explicit save
@@ -1785,7 +1823,9 @@ class StypeEngine(QObject):
         self.model = None
         self.recording = False
         self.processing = False
+        self._toggle_lock = threading.Lock()
         self.cancelled = False
+
         self.audio_frames_mic = []
         self.audio_frames_sys = []
         self._system_stream_active = False
@@ -1830,9 +1870,10 @@ class StypeEngine(QObject):
 
         # Tray icon
         qapp = QApplication.instance()
-        icon_path = os.path.join(DATA_DIR, "assets", "icon.ico")
+        icon_path = os.path.join(APP_DIR, "assets", "icon.ico")
         icon_path = icon_path if os.path.exists(icon_path) else ""
         self.tray_icon = QSystemTrayIcon(QIcon(icon_path), qapp)
+
         self.tray_icon.setToolTip("Stype Dictation Engine")
 
         tray_menu = QMenu()
@@ -1926,7 +1967,8 @@ class StypeEngine(QObject):
             self.stream.start()
         except Exception as e:
             self.stream = None
-            print(f"[Stype] Failed to start mic stream: {e}")
+            logger.error(f"Failed to start mic stream: {e}")
+
 
     def _start_system_stream(self):
         if hasattr(self, 'system_stream') and self.system_stream:
@@ -1939,7 +1981,8 @@ class StypeEngine(QObject):
         except Exception as e:
             self.system_stream = None
             self._system_stream_active = False
-            print(f"[Stype] Failed to start system stream: {e}")
+            logger.error(f"Failed to start system stream: {e}")
+
 
     def _stop_system_stream(self):
         if hasattr(self, 'system_stream') and self.system_stream:
@@ -1968,24 +2011,36 @@ class StypeEngine(QObject):
             self.stream = None
 
     def _register_hotkey(self, hotkey=None):
-        """Register the global hotkey from settings."""
+        """Register the global hotkey from settings.
+        
+        IMPORTANT: The keyboard library fires its callback on a background thread.
+        We must marshal the call to the Qt main thread using QTimer.singleShot.
+        """
         if self._current_hotkey:
             try:
                 keyboard.remove_hotkey(self._current_hotkey)
             except Exception:
                 pass
             self._current_hotkey = None
+
         hotkey = hotkey or data_manager.get("hotkey") or "ctrl+space"
+
+        # Wrap toggle in a Qt-main-thread-safe callback
+        def _hotkey_callback():
+            QTimer.singleShot(0, self._toggle)
+
         try:
-            self._current_hotkey = keyboard.add_hotkey(hotkey, self._toggle)
+            self._current_hotkey = keyboard.add_hotkey(hotkey, _hotkey_callback, suppress=False)
             self._current_hotkey_text = hotkey
+            logger.info(f"Hotkey registered: {hotkey}")
         except Exception as e:
-            print(f"[Stype] Failed to register hotkey '{hotkey}': {e}")
+            logger.warning(f"Failed to register hotkey '{hotkey}': {e}")
             try:
-                self._current_hotkey = keyboard.add_hotkey("ctrl+space", self._toggle)
+                self._current_hotkey = keyboard.add_hotkey("ctrl+space", _hotkey_callback, suppress=False)
                 self._current_hotkey_text = "ctrl+space"
+                logger.info("Fallback hotkey registered: ctrl+space")
             except Exception as fallback_error:
-                print(f"[Stype] Failed to register fallback hotkey 'ctrl+space': {fallback_error}")
+                logger.error(f"Failed to register fallback hotkey 'ctrl+space': {fallback_error}")
                 self._current_hotkey = None
                 self._current_hotkey_text = None
 
@@ -2075,8 +2130,9 @@ class StypeEngine(QObject):
 
     def _on_processing_timeout(self):
         """Auto-cancel if processing takes longer than 15 seconds."""
-        print("[Stype] Processing timeout — force-cancelling.")
+        logger.warning("Processing timeout — force-cancelling.")
         self._cancel()
+
 
     def _toggle_system_audio(self):
         if not self.recording:
@@ -2092,20 +2148,23 @@ class StypeEngine(QObject):
             return
         self._last_toggle = current_time
 
-        if self.processing:
-            self._cancel()
-            return
+        with self._toggle_lock:
+            if self.processing:
+                self._cancel()
+                return
 
-        if self.model is None:
-            return
+            if self.model is None:
+                logger.warning("Toggle ignored: Model not loaded yet.")
+                return
 
-        if not self.recording:
-            self.pill.set_capture_source("microphone")
-            self._emit_state("starting_mic")
-            self._reset_recording_state()
-            threading.Thread(target=self._init_audio_and_record, daemon=True).start()
-        else:
-            self._finish_recording(process_if_speech=True)
+            if not self.recording:
+                self.pill.set_capture_source("microphone")
+                self._emit_state("starting_mic")
+                self._reset_recording_state()
+                threading.Thread(target=self._init_audio_and_record, daemon=True).start()
+            else:
+                self._finish_recording(process_if_speech=True)
+
 
     def _init_audio_and_record(self):
         self._start_mic_stream()
@@ -2116,21 +2175,58 @@ class StypeEngine(QObject):
             self._emit_state("ready")
 
     def _load_model(self, model_id, device):
+        """Load Whisper model. Always uses the bundled model folder directly.
+        
+        When packaged with PyInstaller, we pass the absolute path to the
+        bundled model directory to avoid HuggingFace Hub trying to download
+        anything at runtime.
+        """
         self._emit_state("loading")
         try:
             compute_type = "float16" if device == "cuda" else "int8"
-            self.model = WhisperModel(
-                model_id,
-                device=device,
-                compute_type=compute_type,
-                cpu_threads=os.cpu_count() or 4,
-                num_workers=1,
-                download_root=os.path.join(DATA_DIR, "whisper_model")
-            )
+
+            # Build the path to the bundled model folder
+            whisper_base = os.path.join(APP_DIR, "whisper_model")
+            # faster-whisper expects the model folder in HuggingFace cache layout:
+            # whisper_model/models--Systran--faster-whisper-small.en/snapshots/<hash>/
+            # Try to find the snapshot folder so we can load directly from it
+            bundled_model_path = None
+            hub_folder = os.path.join(whisper_base, "models--Systran--faster-whisper-small.en")
+            snapshots_dir = os.path.join(hub_folder, "snapshots")
+            if os.path.isdir(snapshots_dir):
+                snapshots = [d for d in os.listdir(snapshots_dir)
+                             if os.path.isdir(os.path.join(snapshots_dir, d))]
+                if snapshots:
+                    bundled_model_path = os.path.join(snapshots_dir, snapshots[0])
+                    logger.info(f"Using bundled model at: {bundled_model_path}")
+
+            if bundled_model_path and os.path.isdir(bundled_model_path):
+                # Load directly from the snapshot folder (no download needed)
+                self.model = WhisperModel(
+                    bundled_model_path,
+                    device=device,
+                    compute_type=compute_type,
+                    cpu_threads=os.cpu_count() or 4,
+                    num_workers=1,
+                )
+            else:
+                # Fallback: load by name, allowing HF Hub to manage caching
+                logger.warning(f"Bundled model not found at {whisper_base}, falling back to HF Hub download.")
+                self.model = WhisperModel(
+                    model_id,
+                    device=device,
+                    compute_type=compute_type,
+                    cpu_threads=os.cpu_count() or 4,
+                    num_workers=1,
+                    download_root=whisper_base
+                )
+
+            logger.info("Whisper model loaded successfully.")
             self._emit_state("ready")
         except Exception as e:
-            print(f"[Stype] Model load error: {e}")
+            logger.error(f"Model load error: {e}", exc_info=True)
             self._emit_state("ready")
+
 
     def _reload_model(self, model_id, device):
         self.model = None
@@ -2167,17 +2263,23 @@ class StypeEngine(QObject):
         if len(audio_data_sys) > 0: mixed_audio[:len(audio_data_sys)] += audio_data_sys
 
         # Prevent VAD filter crash/hang on micro-recordings or pure silence
-        if len(mixed_audio) < sample_rate * 0.5:
+        if len(mixed_audio) < sample_rate * 0.3:
+            logger.info("Audio too short, skipping processing.")
             if process_id == self._current_process_id:
                 self.signals.ready_reset.emit()
             return
 
+
         # Check if audio is near-silence (RMS < threshold)
+        # 0.003 is a very conservative floor — real speech always exceeds this
         rms = np.sqrt(np.mean(mixed_audio ** 2))
-        if rms < 0.008:
+        logger.info(f"Audio RMS level: {rms:.5f}")
+        if rms < 0.003:
+            logger.info(f"Audio too silent (RMS: {rms:.5f}), skipping processing.")
             if process_id == self._current_process_id:
                 self.signals.ready_reset.emit()
             return
+
 
         try:
             vocab = []
@@ -2193,10 +2295,14 @@ class StypeEngine(QObject):
             prompt = FORMATTING_PROMPT
             if vocab:
                 prompt += " Vocabulary: " + ", ".join(list(set(vocab))[:50])
+
+            # NOTE: vad_filter=True is intentionally DISABLED.
+            # In a packaged app, faster_whisper's VAD downloads the silero-vad model
+            # from the internet at runtime. This model is NOT bundled, causing the
+            # transcription to silently fail. We do our own silence check above (RMS).
             transcribe_kwargs = dict(
                 beam_size=5,
-                vad_filter=True,
-                vad_parameters=dict(min_silence_duration_ms=500),
+                vad_filter=False,
                 condition_on_previous_text=False,
                 initial_prompt=prompt,
                 language="en"
@@ -2227,9 +2333,10 @@ class StypeEngine(QObject):
                 self.signals.ready_reset.emit()
 
         except Exception as e:
-            print(f"[Stype] Transcription error: {e}")
+            logger.error(f"Transcription error: {e}")
             if process_id == self._current_process_id:
                 self.signals.ready_reset.emit()
+
 
     def _on_transcription(self, text, process_id):
         self._processing_timeout.stop()
@@ -2243,17 +2350,43 @@ class StypeEngine(QObject):
         item = HistoryItem(latest_entry)
         self.dashboard.history_layout.insertWidget(0, item)
 
-        # Paste text
-        hotkey = self._current_hotkey_text or data_manager.get("hotkey") or "ctrl+space"
-        pyperclip.copy(text)
-        for key in hotkey.split("+"):
+        # ── Paste text ──────────────────────────────────────────────
+        # Step 1: Copy text to clipboard (with win32 fallback for packaged apps)
+        clipboard_ok = False
+        try:
+            pyperclip.copy(text)
+            clipboard_ok = True
+        except Exception as clip_err:
+            logger.warning(f"pyperclip failed: {clip_err}, trying win32clipboard...")
             try:
-                keyboard.release(key.strip())
-            except Exception:
-                pass
-        time.sleep(0.05)
-        keyboard.send('ctrl+v')
+                import win32clipboard
+                win32clipboard.OpenClipboard()
+                win32clipboard.EmptyClipboard()
+                win32clipboard.SetClipboardText(text, win32clipboard.CF_UNICODETEXT)
+                win32clipboard.CloseClipboard()
+                clipboard_ok = True
+                logger.info("win32clipboard copy succeeded.")
+            except Exception as w32_err:
+                logger.error(f"win32clipboard also failed: {w32_err}")
 
+        if clipboard_ok:
+            # Step 2: Release any held modifier keys so Ctrl+V isn't swallowed
+            hotkey = self._current_hotkey_text or data_manager.get("hotkey") or "ctrl+space"
+            for key in hotkey.split("+"):
+                try:
+                    keyboard.release(key.strip())
+                except Exception:
+                    pass
+
+            # Step 3: Wait for target window to regain focus, then paste
+            time.sleep(0.15)  # 150ms — much more reliable than 50ms
+            try:
+                keyboard.send('ctrl+v')
+                logger.info(f"Pasted {len(text)} chars.")
+            except Exception as paste_err:
+                logger.error(f"keyboard.send ctrl+v failed: {paste_err}")
+        else:
+            logger.error("Could not copy to clipboard — paste skipped.")
 
         self._emit_state("pasted")
         self.tray_icon.setToolTip("Stype — Ready")
@@ -2268,19 +2401,25 @@ if __name__ == "__main__":
         import ctypes
         _mutex_handle = ctypes.windll.kernel32.CreateMutexW(None, True, "Global\\StypeVoiceDictation_SingleInstance_v2")
         if ctypes.windll.kernel32.GetLastError() == 183:  # ERROR_ALREADY_EXISTS
-            print("[Stype] Another instance is already running.")
+            logger.info("Another instance is already running. Exiting.")
             ctypes.windll.kernel32.CloseHandle(_mutex_handle)
             sys.exit(0)
 
+
     app = QApplication(sys.argv)
     app.setQuitOnLastWindowClosed(False)
-    engine = StypeEngine()
-    exit_code = app.exec()
-
-    # Release mutex on exit
-    if _mutex_handle and os.name == "nt":
-        import ctypes
-        ctypes.windll.kernel32.ReleaseMutex(_mutex_handle)
-        ctypes.windll.kernel32.CloseHandle(_mutex_handle)
+    
+    try:
+        engine = StypeEngine()
+        exit_code = app.exec()
+    except Exception as e:
+        logger.critical(f"Unhandled exception in main loop: {e}", exc_info=True)
+        exit_code = 1
+    finally:
+        # Release mutex on exit
+        if _mutex_handle and os.name == "nt":
+            import ctypes
+            ctypes.windll.kernel32.ReleaseMutex(_mutex_handle)
+            ctypes.windll.kernel32.CloseHandle(_mutex_handle)
 
     sys.exit(exit_code)
