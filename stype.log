@@ -1,0 +1,7 @@
+2026-05-11 16:14:24,032 [INFO] Starting Stype (Frozen: False)
+2026-05-11 16:14:24,032 [INFO] APP_DIR: c:\Users\sumit\OneDrive\Desktop\Project Archives\Stype
+2026-05-11 16:14:24,033 [INFO] USER_DATA_DIR: c:\Users\sumit\OneDrive\Desktop\Project Archives\Stype
+2026-05-11 16:14:36,479 [INFO] HTTP Request: GET https://huggingface.co/api/models/Systran/faster-whisper-small.en/revision/main "HTTP/1.1 200 OK"
+2026-05-11 16:14:40,692 [INFO] Whisper model loaded successfully.
+2026-05-11 16:15:16,943 [INFO] Processing audio with duration 00:33.748
+2026-05-11 16:15:17,251 [INFO] VAD filter removed 00:01.872 of audio
