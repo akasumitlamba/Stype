@@ -3,8 +3,8 @@ Stype — Smart Voice Dictation Engine
 A polished, user-friendly speech-to-text tool with a premium floating pill overlay, dashboard, and auto-learning dictionary.
 """
 import sys
-import re
-import time
+#import re
+#import time
 import json
 import os
 
