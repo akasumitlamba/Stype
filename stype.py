@@ -1,6 +1,6 @@
 """
 Stype — Smart Voice Dictation Engine
-A polished, user-friendly speech-to-text tool with a premium floating pill overlay, dashboard, and auto-learning dictionary.
+A reliable Windows speech-to-text tool with a flat floating pill, dashboard, and explicit personal dictionary.
 """
 import sys
 import re
@@ -8,12 +8,10 @@ import time
 import json
 import os
 
-# Silence huggingface_hub warnings
-os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
-os.environ["HF_HUB_DISABLE_TELEMETRY"] = "1"
-
 import datetime
 import threading
+import subprocess
+from multiprocessing.connection import Listener
 import numpy as np
 import sounddevice as sd
 import keyboard
@@ -32,6 +30,8 @@ else:
     # Running as a script
     APP_DIR = os.path.dirname(os.path.abspath(__file__))
     USER_DATA_DIR = APP_DIR
+
+RESOURCE_DIR = getattr(sys, "_MEIPASS", APP_DIR)
 
 os.makedirs(USER_DATA_DIR, exist_ok=True)
 
@@ -54,48 +54,21 @@ logger.info(f"APP_DIR: {APP_DIR}")
 logger.info(f"USER_DATA_DIR: {USER_DATA_DIR}")
 
 
-# ═══════════════════════════════════════════════════════════
-# WINDOWS SYMLINK FIX
-# ═══════════════════════════════════════════════════════════
-# HuggingFace Hub tries to use symlinks for caching models. On Windows, 
-# this requires Developer Mode or Admin rights, otherwise it throws WinError 1314.
-# We intercept os.symlink and force it to copy the file instead.
-if os.name == "nt":
-    def _patched_symlink(src, dst, target_is_directory=False, **kwargs):
-        if os.path.isdir(src):
-            shutil.copytree(src, dst)
-        else:
-            shutil.copy2(src, dst)
-    os.symlink = _patched_symlink
-
-from faster_whisper import WhisperModel
-
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QComboBox, QPushButton, QFrame, QScrollArea,
     QSystemTrayIcon, QMenu, QLineEdit, QFileDialog,
-    QTabWidget, QTextEdit, QAbstractButton
+    QTabWidget, QTextEdit, QAbstractButton, QMessageBox, QProgressBar
 )
 from PyQt6.QtCore import (
     Qt, pyqtSignal, pyqtProperty, QObject, QTimer, QPropertyAnimation,
-    QRect, QPoint, QEasingCurve
+    QRect, QPoint, QEasingCurve, QByteArray, QMimeData
 )
 from PyQt6.QtGui import (
     QFont, QColor, QPainter, QPen, QBrush,
-    QPainterPath, QIcon, QAction, QKeySequence
+    QPainterPath, QIcon, QAction, QKeySequence, QFontMetrics
 )
-# ═══════════════════════════════════════════════════════════
-#  CONSTANTS
-# ═══════════════════════════════════════════════════════════
-FORMATTING_PROMPT = (
-    "This is a highly accurate, professionally formatted transcription. "
-    "It uses proper punctuation: commas, periods, question marks, and exclamation marks. "
-    "When the speaker lists items, they are formatted as a bullet list:\n"
-    "- First item\n- Second item\n- Third item\n"
-    "Sentences are properly capitalized."
-)
-
-
+logger.info("Qt imports complete")
 # ═══════════════════════════════════════════════════════════
 #  DATA MANAGER (Persistence & Learning)
 # ═══════════════════════════════════════════════════════════
@@ -104,7 +77,7 @@ FORMATTING_PROMPT = (
 
 DEFAULT_SETTINGS = {
     "hotkey": "ctrl+space",
-    "model": "Balanced (Small)",
+    "model": "Accurate (Large v3 Turbo)",
     "device": "CPU",
     "language": "English",
     "mic_device": "",  # empty = system default
@@ -140,7 +113,7 @@ class DataManager:
     def load(self):
         if os.path.exists(DATA_FILE):
             try:
-                with open(DATA_FILE, 'r') as f:
+                with open(DATA_FILE, 'r', encoding='utf-8') as f:
                     loaded = json.load(f)
                     self.data["personal_dict"] = loaded.get("personal_dict", [])
                     if not self.data["personal_dict"] and "dictionary" in loaded:
@@ -151,16 +124,31 @@ class DataManager:
                     saved_settings = loaded.get("settings", {})
                     for k, v in DEFAULT_SETTINGS.items():
                         self.data["settings"][k] = saved_settings.get(k, v)
+                    # Earlier releases silently forced small.en. Migrate that
+                    # implementation detail once; users can still choose the new
+                    # explicit Fast profile afterwards.
+                    if self.data["settings"].get("model") in ("Balanced", "Balanced (Small)", "small.en"):
+                        self.data["settings"]["model"] = "Accurate (Large v3 Turbo)"
             except Exception as e:
                 logger.error(f"Error loading data: {e}")
 
 
     def save(self):
+        temporary_file = DATA_FILE + ".tmp"
         try:
-            with open(DATA_FILE, 'w') as f:
-                json.dump(self.data, f, indent=4)
+            os.makedirs(os.path.dirname(DATA_FILE), exist_ok=True)
+            with open(temporary_file, 'w', encoding='utf-8') as f:
+                json.dump(self.data, f, indent=4, ensure_ascii=False)
+                f.flush()
+                os.fsync(f.fileno())
+            os.replace(temporary_file, DATA_FILE)
         except Exception as e:
             logger.error(f"Error saving data: {e}")
+            try:
+                if os.path.exists(temporary_file):
+                    os.remove(temporary_file)
+            except OSError:
+                pass
 
 
     def get(self, key):
@@ -253,6 +241,7 @@ class DataManager:
 
 
 data_manager = DataManager()
+logger.info("Data manager ready")
 
 STARTUP_APP_NAME = "Stype"
 STARTUP_RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
@@ -366,9 +355,10 @@ def find_input_device_index(display_name):
     return None
 
 class SystemAudioStream:
-    def __init__(self, callback, samplerate=16000):
+    def __init__(self, callback, samplerate=16000, error_callback=None):
         self.callback = callback
         self.samplerate = samplerate
+        self.error_callback = error_callback
         self.running = False
         self.thread = None
 
@@ -382,10 +372,12 @@ class SystemAudioStream:
         import warnings
         warnings.filterwarnings("ignore", message="data discontinuity in recording")
         try:
-            mics = sc.all_microphones(include_loopback=True)
-            if not mics: return
             default_spk = sc.default_speaker()
-            loopback_mic = next((m for m in mics if m.id == default_spk.id), mics[0])
+            if default_spk is None:
+                raise RuntimeError("Windows has no default playback device")
+            loopback_mic = sc.get_microphone(id=str(default_spk.name), include_loopback=True)
+            if loopback_mic is None:
+                raise RuntimeError("No loopback input is available for the default speaker")
             with loopback_mic.recorder(samplerate=self.samplerate, channels=1) as mic:
                 while self.running:
                     data = mic.record(numframes=1024)
@@ -393,6 +385,9 @@ class SystemAudioStream:
                         self.callback(data, len(data), None, None)
         except Exception as e:
             logger.error(f"System audio error: {e}")
+            self.running = False
+            if self.error_callback:
+                self.error_callback(str(e))
 
 
     def stop(self):
@@ -421,31 +416,82 @@ def resample_audio(audio_data, source_rate, target_rate=16000):
 #  CONSTANTS
 # ═══════════════════════════════════════════════════════════
 MODELS = {
-    "Balanced": "small.en",
+    "Accurate (Large v3 Turbo)": "large-v3-turbo",
+    "Fast (English only)": "small.en",
 }
+MODEL_LABELS = {model_id: label for label, model_id in MODELS.items()}
+DEFAULT_MODEL_ID = "large-v3-turbo"
 
-# ── Neobrutalism Palette ──
-NB_BG       = "#FFFDF7"   # warm cream background
-NB_CARD     = "#FFFFFF"   # card white
-NB_INK      = "#1A1A2E"   # near-black ink
-NB_ORANGE   = "#FF6B35"   # primary accent
-NB_PURPLE   = "#7B61FF"   # secondary accent
-NB_GREEN    = "#06D6A0"   # success / listening
-NB_YELLOW   = "#FFD166"   # warning / processing
-NB_PINK     = "#EF476F"   # danger / cancel
-NB_BLUE     = "#118AB2"   # info
-NB_MUTED    = "#6C757D"   # muted text
-NB_BORDER   = "#1A1A2E"   # thick borders
-NB_SHADOW   = "#1A1A2E"   # hard shadow color
+
+def compatible_model(model_id, language_code):
+    """English-only checkpoints must never handle multilingual dictation."""
+    if model_id == "small.en" and language_code != "en":
+        return "large-v3-turbo"
+    return model_id
+
+
+def user_facing_engine_error(error):
+    message = str(error).strip()
+    lower = message.casefold()
+    if "not enough free storage" in lower:
+        return message
+    if any(term in lower for term in ("connection", "timed out", "network", "resolve", "offline", "429")):
+        return "The model download could not reach Hugging Face. Check your internet connection, then press Retry engine."
+    if any(term in lower for term in ("model.bin", "corrupt", "checksum", "deserialize")):
+        return "The cached model appears incomplete or damaged. Press Retry engine to resume the download."
+    return f"The speech engine could not start: {message}. Press Retry engine to try again."
+
+
+def resolve_model_path(model_id, app_dir=RESOURCE_DIR, user_data_dir=USER_DATA_DIR):
+    """Return a verified bundled or downloaded model directory, or None."""
+    repo_name = {
+        "small.en": "models--Systran--faster-whisper-small.en",
+        "large-v3-turbo": "models--mobiuslabsgmbh--faster-whisper-large-v3-turbo",
+    }.get(model_id)
+    required = ("model.bin", "config.json", "tokenizer.json")
+    for whisper_base in (
+        os.path.join(app_dir, "whisper_model"),
+        os.path.join(user_data_dir, "models"),
+    ):
+        if model_id == "large-v3-turbo":
+            direct = os.path.join(whisper_base, "faster-whisper-large-v3-turbo")
+            if all(os.path.isfile(os.path.join(direct, name)) for name in required):
+                return direct
+        snapshots_dir = os.path.join(whisper_base, repo_name, "snapshots") if repo_name else ""
+        if os.path.isdir(snapshots_dir):
+            for snapshot in sorted(os.listdir(snapshots_dir), reverse=True):
+                candidate = os.path.join(snapshots_dir, snapshot)
+                if all(os.path.isfile(os.path.join(candidate, name)) for name in required):
+                    return candidate
+    return None
+
+
+# Website visual tokens, shared with website/style.css.
+NB_BG       = "#FFFDF7"
+NB_CARD     = "#FFFFFF"
+NB_INK      = "#1A1A2E"
+NB_ORANGE   = "#FF6B35"
+NB_PURPLE   = "#7B61FF"
+NB_GREEN    = "#06D6A0"
+NB_YELLOW   = "#FFD166"
+NB_PINK     = "#EF476F"
+NB_BLUE     = "#118AB2"
+NB_MUTED    = "#59606A"
+NB_BORDER   = NB_INK
+NB_SHADOW   = NB_INK
+PILL_READY_SIZE = (44, 24)
+PILL_ACTIVE_SIZE = (124, 26)
 
 STATES = {
     "loading":      {"label": "Loading...",    "dot": NB_YELLOW, "border": NB_INK},
+    "downloading":  {"label": "Downloading",   "dot": NB_BLUE,   "border": NB_INK},
     "starting_mic": {"label": "Opening Mic...", "dot": NB_MUTED,  "border": NB_INK},
     "starting_system": {"label": "Opening Sound...", "dot": NB_BLUE, "border": NB_INK},
     "ready":        {"label": "Ready",         "dot": NB_GREEN,  "border": NB_INK},
     "listening":    {"label": "Listening...",  "dot": NB_GREEN,  "border": NB_INK},
     "processing":   {"label": "Processing...", "dot": NB_YELLOW, "border": NB_INK},
     "pasted":       {"label": "Pasted",        "dot": NB_GREEN,  "border": NB_INK},
+    "error":        {"label": "Needs attention", "dot": NB_PINK, "border": NB_INK},
 }
 
 # ═══════════════════════════════════════════════════════════
@@ -485,20 +531,18 @@ class ToggleSwitch(QAbstractButton):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
         
-        # Track — neobrutalism: solid color, thick border, subtle rounding
         track_color = QColor(NB_ORANGE) if self.isChecked() else QColor("#E0DDD5")
-        p.setPen(QPen(QColor(NB_BORDER), 2.0))
+        p.setPen(QPen(QColor(NB_INK), 2.0))
         p.setBrush(track_color)
         p.drawRoundedRect(1, 1, self.width() - 2, self.height() - 2, 10, 10)
         
-        # Thumb — white circle with black border
-        p.setPen(QPen(QColor(NB_BORDER), 1.5))
+        p.setPen(QPen(QColor(NB_INK), 1.5))
         p.setBrush(QColor("#ffffff"))
         p.drawEllipse(self._thumb_pos, 2, 16, 16)
         p.end()
 
 
-class BrutalComboBox(QComboBox):
+class FlatComboBox(QComboBox):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._arrow = QLabel("▼", self)
@@ -515,21 +559,100 @@ class Signals(QObject):
     state_changed = pyqtSignal(str)          
     transcription_done = pyqtSignal(str, int)
     ready_reset = pyqtSignal()  # thread-safe "go back to ready" signal
+    toggle_requested = pyqtSignal()
+    audio_level_changed = pyqtSignal(float)
+    engine_detail_changed = pyqtSignal(str)
+    model_download_progress = pyqtSignal(int, str)
+    audio_error = pyqtSignal(str)
+    capture_source_changed = pyqtSignal(str)
 
-def post_process(text: str) -> str:
+def collapse_transcription_loops(text: str) -> str:
+    """Remove pathological 3+ consecutive word/phrase loops from ASR output."""
+    tokens = text.split()
+    normalized = [re.sub(r"[^\w]+", "", token, flags=re.UNICODE).casefold() for token in tokens]
+    output = []
+    index = 0
+    while index < len(tokens):
+        collapsed = False
+        for width in range(min(8, (len(tokens) - index) // 3), 0, -1):
+            phrase = normalized[index:index + width]
+            if not any(phrase):
+                continue
+            repeats = 1
+            while normalized[index + repeats * width:index + (repeats + 1) * width] == phrase:
+                repeats += 1
+            if repeats >= 3:
+                output.extend(tokens[index:index + width])
+                index += repeats * width
+                collapsed = True
+                break
+        if not collapsed:
+            output.append(tokens[index])
+            index += 1
+    return " ".join(output)
+
+
+def build_transcription_options(language_code, vocab):
+    """Create deterministic native-language ASR options without prompt bias."""
+    return dict(
+        beam_size=5,
+        vad_filter=True,
+        vad_parameters=dict(min_silence_duration_ms=350, speech_pad_ms=180),
+        condition_on_previous_text=False,
+        task="transcribe",
+        multilingual=True,
+        hotwords=", ".join(list(dict.fromkeys(vocab))[:50]) or None,
+        language=language_code,
+        temperature=0,
+        repetition_penalty=1.12,
+        no_repeat_ngram_size=3,
+        hallucination_silence_threshold=1.0,
+    )
+
+
+def dictionary_hotwords(entries):
+    """Only explicit vocabulary items may bias recognition."""
+    words = []
+    for entry in entries:
+        if entry.get("type") != "vocab":
+            continue
+        target = entry.get("target", "").strip()
+        if target and target.casefold() not in {word.casefold() for word in words}:
+            words.append(target)
+    return words[:50]
+
+
+def post_process(text: str, language_code=None) -> str:
     text = text.strip()
     if not text:
         return text
 
+    visible = [character for character in text if not character.isspace()]
+    if len(visible) >= 6 and sum(character.isalnum() for character in visible) / len(visible) < 0.25:
+        logger.warning("Discarded punctuation-only transcription artifact.")
+        return ""
+
+    text = collapse_transcription_loops(text)
+    text = re.sub(r"([.\-·•])\1{3,}", r"\1", text)
+
+    replacement_map = {}
     for entry in data_manager.data.get("personal_dict", []):
-        target = entry.get("target", "").strip()
-        replacement = entry.get("replacement", "").strip()
-        if target and replacement and target.lower() != replacement.lower():
-            pattern = r'\b' + re.escape(target) + r'\b'
-            try:
-                text = re.sub(pattern, replacement, text, flags=re.IGNORECASE)
-            except Exception:
-                pass
+        if entry.get("type", "replace") == "replace":
+            target = entry.get("target", "").strip()
+            replacement = entry.get("replacement", "").strip()
+            if target and replacement and target != replacement:
+                replacement_map.setdefault(target.casefold(), (target, replacement))
+    if replacement_map:
+        alternatives = sorted(
+            (re.escape(target) for target, _replacement in replacement_map.values()),
+            key=len,
+            reverse=True,
+        )
+        pattern = re.compile(r"(?<!\w)(?:" + "|".join(alternatives) + r")(?!\w)", re.IGNORECASE)
+        text = pattern.sub(lambda match: replacement_map[match.group(0).casefold()][1], text)
+
+    if language_code not in (None, "en"):
+        return text
 
     ordinal_pattern = re.compile(
         r'\b(first(?:ly)?|second(?:ly)?|third(?:ly)?|fourth(?:ly)?|fifth(?:ly)?|'
@@ -588,7 +711,7 @@ def post_process(text: str) -> str:
                     result += f"- {item}\n"
             return result.strip()
 
-    if text and text[-1] not in '.!?':
+    if text and text[-1] not in '.!?。！？؟':
         text += '.'
     return text
 
@@ -601,20 +724,20 @@ class PillOverlay(QWidget):
     clicked_cancel = pyqtSignal()
     clicked_dashboard = pyqtSignal()
     clicked_system_audio = pyqtSignal()
+    clicked_quit = pyqtSignal()
 
     def __init__(self):
         super().__init__()
         self.setWindowFlags(
             Qt.WindowType.FramelessWindowHint |
             Qt.WindowType.WindowStaysOnTopHint |
-            Qt.WindowType.Tool
+            Qt.WindowType.Tool |
+            Qt.WindowType.WindowDoesNotAcceptFocus
         )
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         
-        # Ready size
-        self._ready_w, self._ready_h = 56, 26
-        # Active size
-        self._active_w, self._active_h = 130, 26
+        self._ready_w, self._ready_h = PILL_READY_SIZE
+        self._active_w, self._active_h = PILL_ACTIVE_SIZE
         
         self.resize(self._ready_w, self._ready_h)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -628,6 +751,7 @@ class PillOverlay(QWidget):
         self._manually_hidden = False
         self._system_audio_enabled = False
         self._capture_source = "microphone"
+        self._download_percent = 0
 
         self._hide_timer = QTimer(self)
         self._hide_timer.setSingleShot(True)
@@ -657,12 +781,12 @@ class PillOverlay(QWidget):
         menu = QMenu(self)
         menu.setStyleSheet(f"""
             QMenu {{
-                background-color: {NB_BG};
-                border: 2px solid {NB_BORDER};
+                background-color: {NB_CARD};
+                border: 2px solid {NB_INK};
                 color: {NB_INK};
                 padding: 4px;
-                font-family: 'Segoe UI', sans-serif;
-                font-weight: 600;
+                font-family: 'Inter', 'Segoe UI', sans-serif;
+                font-weight: 700;
             }}
             QMenu::item {{
                 padding: 8px 20px;
@@ -687,7 +811,7 @@ class PillOverlay(QWidget):
 
         menu.addSeparator()
         quit_action = menu.addAction("Quit App")
-        quit_action.triggered.connect(QApplication.instance().quit)
+        quit_action.triggered.connect(self.clicked_quit.emit)
         menu.exec(event.globalPos())
 
     def _hide_for_hour(self):
@@ -707,10 +831,13 @@ class PillOverlay(QWidget):
 
     def _resize_and_center(self, target_w, target_h):
         if self.width() == target_w and self.height() == target_h: return
+        old_center = self.frameGeometry().center()
         self.resize(target_w, target_h)
-        screen = QApplication.primaryScreen().availableGeometry()
-        cx = screen.left() + screen.width() // 2
-        self.move(cx - target_w // 2, screen.bottom() - target_h - 18)
+        screen = QApplication.screenAt(old_center) or QApplication.primaryScreen()
+        bounds = screen.availableGeometry()
+        x = max(bounds.left(), min(old_center.x() - target_w // 2, bounds.right() - target_w + 1))
+        y = max(bounds.top(), min(old_center.y() - target_h // 2, bounds.bottom() - target_h + 1))
+        self.move(x, y)
 
     def set_audio_level(self, level: float):
         self._audio_level = max(0.0, min(1.0, level))
@@ -723,9 +850,15 @@ class PillOverlay(QWidget):
         self._capture_source = source or "microphone"
         self.update()
 
+    def set_download_progress(self, percent, _detail=""):
+        self._download_percent = max(0, min(100, int(percent)))
+        if self._state == "downloading":
+            self.set_state("downloading")
+        self.update()
+
     def _system_button_w(self):
         if self._system_audio_enabled and self._state in ["starting_mic", "starting_system", "listening"]:
-            return 26
+            return 22
         return 0
 
     def _system_audio_open(self):
@@ -762,14 +895,15 @@ class PillOverlay(QWidget):
             self._audio_level = 0.0
 
         icon_w = self._system_button_w()
-        if state_key in ["starting_mic", "starting_system", "listening"]:
-            target_w = 84 + icon_w
-        elif state_key in ["processing"]:
-            target_w = 134 + icon_w
-        elif state_key in ["loading", "pasted"]:
-            target_w = 106 + icon_w
-        else:
-            target_w = self._ready_w + icon_w
+        label = STATES.get(state_key, STATES["ready"])["label"]
+        if state_key == "downloading":
+            label = f"Downloading {self._download_percent}%"
+        metrics = QFontMetrics(QFont("Inter", 8, QFont.Weight.Bold))
+        has_cancel = state_key in ["starting_mic", "starting_system", "listening", "processing"]
+        target_w = self._ready_w if state_key == "ready" else max(
+            82 + icon_w,
+            metrics.horizontalAdvance(label) + 32 + icon_w + (22 if has_cancel else 0),
+        )
             
         ready_w = self._ready_w + icon_w
         self._resize_and_center(target_w, self._active_h if target_w != ready_w else self._ready_h)
@@ -783,11 +917,72 @@ class PillOverlay(QWidget):
 
         self.update()
 
+    def paintEvent(self, event):
+        """Flat pill renderer with content-measured text and no shadows."""
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        state = STATES.get(self._state, STATES["ready"])
+        bounds = self.rect().adjusted(1, 1, -1, -1)
+        painter.setPen(QPen(QColor(NB_INK), 1.5))
+        painter.setBrush(QColor(NB_BG))
+        painter.drawRoundedRect(bounds, 6, 6)
+
+        if self._state == "ready":
+            painter.setPen(Qt.PenStyle.NoPen)
+            center_x, center_y = self.width() // 2, self.height() // 2
+            for offset, color in ((-8, NB_ORANGE), (0, NB_PURPLE), (8, NB_GREEN)):
+                painter.setBrush(QColor(color))
+                painter.drawEllipse(QPoint(center_x + offset, center_y), 2, 2)
+            painter.end()
+            return
+
+        icon_width = self._system_button_w()
+        if icon_width:
+            source_rect = QRect(1, 1, icon_width, self.height() - 2)
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.setBrush(QColor(NB_PURPLE if self._system_audio_open() else NB_YELLOW))
+            painter.drawRoundedRect(source_rect, 5, 5)
+            painter.setPen(QPen(QColor("#FFFFFF" if self._system_audio_open() else NB_INK), 1.3))
+            center_y = self.height() // 2
+            painter.drawRect(5, center_y - 2, 3, 4)
+            painter.drawLine(8, center_y - 2, 12, center_y - 5)
+            painter.drawLine(12, center_y - 5, 12, center_y + 5)
+            painter.drawLine(12, center_y + 5, 8, center_y + 2)
+
+        has_cancel = self._state in ["starting_mic", "starting_system", "listening", "processing"]
+        cancel_width = 22 if has_cancel else 0
+        if has_cancel:
+            cancel_x = self.width() - cancel_width
+            painter.setPen(QPen(QColor(NB_INK), 1))
+            painter.drawLine(cancel_x, 5, cancel_x, self.height() - 5)
+            painter.setPen(QPen(QColor(NB_PINK), 1.6, cap=Qt.PenCapStyle.RoundCap))
+            center_x, center_y = cancel_x + cancel_width // 2, self.height() // 2
+            painter.drawLine(center_x - 4, center_y - 4, center_x + 4, center_y + 4)
+            painter.drawLine(center_x - 4, center_y + 4, center_x + 4, center_y - 4)
+
+        dot_x = icon_width + 12
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QColor(state["dot"]))
+        painter.drawEllipse(QPoint(dot_x, self.height() // 2), 3, 3)
+
+        label = state["label"]
+        if self._state == "downloading":
+            label = f"Downloading {self._download_percent}%"
+        painter.setFont(QFont("Inter", 8, QFont.Weight.Bold))
+        painter.setPen(QColor(NB_INK))
+        text_left = dot_x + 9
+        painter.drawText(
+            QRect(text_left, 0, self.width() - text_left - cancel_width - 8, self.height()),
+            Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft,
+            label,
+        )
+        painter.end()
+
     def _blink_tick(self):
         self._blink_on = not self._blink_on
         self.update()
 
-    def paintEvent(self, event):
+    def _legacy_paintEvent(self, event):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
 
@@ -968,8 +1163,10 @@ class PillOverlay(QWidget):
 
     def mouseMoveEvent(self, event):
         if self._drag_pos and event.buttons() & Qt.MouseButton.LeftButton:
-            self.move(event.globalPosition().toPoint() - self._drag_pos)
-            self._drag_moved = True
+            next_position = event.globalPosition().toPoint() - self._drag_pos
+            if self._drag_moved or (next_position - self.pos()).manhattanLength() >= QApplication.startDragDistance():
+                self.move(next_position)
+                self._drag_moved = True
 
     def mouseReleaseEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton and not self._drag_moved:
@@ -979,7 +1176,7 @@ class PillOverlay(QWidget):
             if icon_w > 0 and event.pos().x() <= icon_w + 4:
                 self.clicked_system_audio.emit()
             # If clicked on X button during active states
-            elif self._state in ["listening", "starting_mic", "starting_system", "processing"] and event.pos().x() > w - 34:
+            elif self._state in ["listening", "starting_mic", "starting_system", "processing"] and event.pos().x() >= w - 22:
                 self.clicked_cancel.emit()
             else:
                 self.clicked_toggle.emit()
@@ -1003,12 +1200,13 @@ class HistoryItem(QFrame):
         self.setObjectName("HistoryItem")
         self.setStyleSheet(f"""
             QFrame#HistoryItem {{
-                background: {NB_CARD};
-                border: 2px solid {NB_BORDER};
+                background: #FFF4DF;
+                border: 2px solid {NB_ORANGE};
+                border-radius: 6px;
             }}
             QFrame#HistoryItem:hover {{
-                background: #FFF8ED;
-                border: 2px solid {NB_ORANGE};
+                background: #FFEDD0;
+                border: 2px solid {NB_INK};
             }}
             QLabel {{
                 color: {NB_INK};
@@ -1025,19 +1223,22 @@ class HistoryItem(QFrame):
             QPushButton {{
                 background: {NB_YELLOW};
                 color: {NB_INK};
-                border: 2px solid {NB_BORDER};
-                padding: 5px 12px;
+                border: 2px solid {NB_INK};
+                border-radius: 5px;
+                padding: 0 12px;
                 font-size: 11px;
                 font-weight: 800;
+                min-height: 32px;
+                max-height: 32px;
                 min-width: 70px;
             }}
             QPushButton:hover {{
-                background: {NB_ORANGE};
-                color: white;
+                background: #FFE19A;
             }}
             QTextEdit {{
                 background: {NB_BG};
-                border: 2px solid {NB_BORDER};
+                border: 1px solid {NB_BORDER};
+                border-radius: 4px;
                 padding: 10px;
                 color: {NB_INK};
                 font-family: 'Segoe UI', sans-serif;
@@ -1114,21 +1315,25 @@ class DictEntryWidget(QFrame):
         self.setStyleSheet(f"""
             QFrame#DictEntryWidget {{
                 background: {NB_CARD};
-                border: 2px solid {NB_BORDER};
+                border: 2px solid {NB_INK};
+                border-radius: 6px;
             }}
             QPushButton {{
                 background: {NB_PINK};
                 color: white;
-                border: 2px solid {NB_BORDER};
-                font-weight: 800;
+                border: 2px solid {NB_INK};
+                border-radius: 4px;
+                font-weight: 600;
                 font-size: 14px;
             }}
             QPushButton:hover {{
-                background: #D63B5C;
+                background: #D83B61;
+                color: white;
             }}
             QLineEdit {{
-                background: {NB_BG};
-                border: 2px solid {NB_BORDER};
+                background: {NB_CARD};
+                border: 2px solid {NB_INK};
+                border-radius: 4px;
                 padding: 4px 8px;
                 color: {NB_INK};
                 font-size: 12px;
@@ -1168,7 +1373,7 @@ class DictEntryWidget(QFrame):
             
         del_btn = QPushButton("×")
         del_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        del_btn.setFixedSize(24, 24)
+        del_btn.setFixedSize(32, 32)
         del_btn.clicked.connect(lambda: on_delete(self))
         
         layout.addWidget(del_btn)
@@ -1182,13 +1387,18 @@ class DictEntryWidget(QFrame):
             self.on_change()
 
 # ═══════════════════════════════════════════════════════════
-#  MINIMAL BACKGROUND WIDGET
+#  FLAT BACKGROUND WIDGET
 # ═══════════════════════════════════════════════════════════
-class PremiumBackgroundWidget(QWidget):
+class FlatBackgroundWidget(QWidget):
     def paintEvent(self, event):
         p = QPainter(self)
-        p.setRenderHint(QPainter.RenderHint.Antialiasing)
         p.fillRect(0, 0, self.width(), self.height(), QColor(NB_BG))
+        p.setPen(QPen(QColor(26, 26, 46, 12), 1))
+        for x in range(0, self.width(), 32):
+            p.drawLine(x, 0, x, self.height())
+        for y in range(0, self.height(), 32):
+            p.drawLine(0, y, self.width(), y)
+        p.end()
 
 
 # ═══════════════════════════════════════════════════════════
@@ -1197,11 +1407,13 @@ class PremiumBackgroundWidget(QWidget):
 class MainWindow(QMainWindow):
     model_changed = pyqtSignal(str, str)
     settings_changed = pyqtSignal()  # emitted when any setting changes
+    toggle_requested = pyqtSignal()
 
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Stype Dashboard")
-        self.setMinimumSize(440, 640)
+        self.setWindowTitle("Stype — Voice to text")
+        self.setMinimumSize(560, 680)
+        self.resize(700, 760)
 
         self.setStyleSheet(f"""
             * {{
@@ -1230,8 +1442,9 @@ class MainWindow(QMainWindow):
             }}
             QComboBox {{
                 background-color: {NB_CARD};
-                border: 2px solid {NB_BORDER};
-                padding: 7px 38px 7px 12px;
+                border: 1px solid {NB_BORDER};
+                border-radius: 8px;
+                padding: 9px 38px 9px 12px;
                 color: {NB_INK};
                 font-size: 12px;
                 font-weight: 600;
@@ -1245,7 +1458,7 @@ class MainWindow(QMainWindow):
             }}
             QComboBox::drop-down {{
                 border: none;
-                border-left: 2px solid {NB_BORDER};
+                border-left: 1px solid {NB_BORDER};
                 width: 30px;
             }}
             QComboBox::down-arrow {{
@@ -1255,7 +1468,7 @@ class MainWindow(QMainWindow):
             }}
             QComboBox QAbstractItemView {{
                 background-color: {NB_CARD};
-                border: 2px solid {NB_BORDER};
+                border: 1px solid {NB_BORDER};
                 color: {NB_INK};
                 selection-background-color: {NB_ORANGE};
                 outline: 0;
@@ -1266,60 +1479,65 @@ class MainWindow(QMainWindow):
             }}
             QComboBox QAbstractItemView::item:selected {{
                 background-color: {NB_ORANGE};
-                color: white;
+                color: #07110D;
             }}
             QPushButton#apply_btn {{
                 background-color: {NB_ORANGE};
-                color: #ffffff;
+                color: #07110D;
                 font-weight: 800;
                 font-size: 13px;
-                border: 3px solid {NB_BORDER};
+                border: none;
+                border-radius: 9px;
                 padding: 11px 20px;
                 min-height: 38px;
             }}
-            QPushButton#apply_btn:hover {{ background-color: #E85D2A; }}
-            QPushButton#apply_btn:pressed {{ background-color: #CC4F22; }}
+            QPushButton#apply_btn:hover {{ background-color: #91F0CB; }}
+            QPushButton#apply_btn:pressed {{ background-color: #51CCA0; }}
             QPushButton#secondary_btn {{
-                background-color: {NB_YELLOW};
+                background-color: {NB_CARD};
                 color: {NB_INK};
                 font-weight: 700;
                 font-size: 12px;
-                border: 2px solid {NB_BORDER};
+                border: 1px solid {NB_BORDER};
+                border-radius: 8px;
                 padding: 8px 16px;
                 min-height: 32px;
             }}
             QPushButton#secondary_btn:hover {{
-                background-color: {NB_ORANGE};
-                color: white;
+                border-color: {NB_ORANGE};
             }}
             QPushButton#quit_btn {{
-                background-color: {NB_PINK};
-                color: #ffffff;
-                font-weight: 900;
+                background-color: transparent;
+                color: {NB_MUTED};
+                font-weight: 700;
                 font-size: 13px;
-                border: 2px solid {NB_BORDER};
+                border: 1px solid {NB_BORDER};
+                border-radius: 8px;
                 padding: 4px 12px;
                 min-height: 24px;
             }}
             QPushButton#quit_btn:hover {{
-                background-color: #D63B5C;
+                color: white;
+                border-color: {NB_PINK};
             }}
             QPushButton#hotkey_btn {{
-                background-color: {NB_PURPLE};
-                color: #ffffff;
+                background-color: {NB_CARD};
+                color: {NB_PURPLE};
                 font-weight: 800;
                 font-size: 13px;
-                border: 2px solid {NB_BORDER};
+                border: 1px solid {NB_PURPLE};
+                border-radius: 8px;
                 padding: 8px 16px;
                 min-height: 32px;
                 letter-spacing: 1px;
             }}
             QPushButton#hotkey_btn:hover {{
-                background-color: #6A50E0;
+                background-color: #1A2230;
             }}
             QLineEdit {{
                 background: {NB_CARD};
-                border: 2px solid {NB_BORDER};
+                border: 1px solid {NB_BORDER};
+                border-radius: 8px;
                 padding: 7px 12px;
                 color: {NB_INK};
                 font-size: 12px;
@@ -1332,20 +1550,18 @@ class MainWindow(QMainWindow):
                 background: transparent;
             }}
             QTabBar::tab {{
-                background: {NB_CARD};
+                background: transparent;
                 color: {NB_MUTED};
                 padding: 10px 18px;
                 font-size: 12px;
                 font-weight: 700;
-                border: 2px solid {NB_BORDER};
-                border-bottom: none;
+                border: none;
+                border-bottom: 2px solid transparent;
                 min-width: 70px;
-                margin-right: -2px;
             }}
             QTabBar::tab:selected {{
-                color: {NB_INK};
-                background: {NB_ORANGE};
-                color: white;
+                color: {NB_ORANGE};
+                border-bottom-color: {NB_ORANGE};
             }}
             QTabBar::tab:hover {{ color: {NB_INK}; }}
             QCheckBox {{
@@ -1378,8 +1594,52 @@ class MainWindow(QMainWindow):
             QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height: 0px; }}
             QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: none; }}
         """)
+        self.setStyleSheet(self.styleSheet() + f"""
+            QWidget {{ background-color: transparent; color: {NB_INK}; }}
+            QPushButton {{
+                min-height: 36px; max-height: 36px;
+                padding: 0 14px; border-radius: 6px;
+                border: 2px solid {NB_INK};
+                background: {NB_YELLOW}; color: {NB_INK};
+                font-family: 'Inter', 'Segoe UI';
+                font-size: 12px; font-weight: 700;
+            }}
+            QPushButton:hover {{ background: #FFE19A; }}
+            QPushButton:pressed {{ background: #F4C65B; }}
+            QPushButton:disabled {{ color: #8B8D96; background: #E8E5DD; }}
+            QPushButton#apply_btn {{
+                min-height: 36px; max-height: 36px;
+                padding: 0 16px; border-radius: 6px; border: 2px solid {NB_INK};
+                background: {NB_ORANGE}; color: white; font-size: 12px; font-weight: 800;
+            }}
+            QPushButton#apply_btn:hover {{ background: #F45E28; }}
+            QPushButton#secondary_btn, QPushButton#hotkey_btn, QPushButton#quit_btn {{
+                min-height: 36px; max-height: 36px; padding: 0 14px;
+                border-radius: 6px; border: 2px solid {NB_INK};
+                background: {NB_CARD}; color: {NB_INK}; font-size: 12px; font-weight: 700;
+            }}
+            QPushButton#hotkey_btn {{ background: {NB_PURPLE}; color: white; }}
+            QComboBox, QLineEdit {{
+                min-height: 36px; max-height: 36px; padding: 0 12px;
+                border-radius: 5px; border: 2px solid {NB_INK};
+                background: {NB_CARD}; color: {NB_INK}; font-weight: 600;
+            }}
+            QTabBar::tab {{
+                min-height: 34px; padding: 0 16px; border: none;
+                border-bottom: 2px solid transparent; background: transparent;
+                color: {NB_MUTED}; font-weight: 700;
+            }}
+            QTabBar::tab:selected {{ color: {NB_INK}; border-bottom-color: {NB_ORANGE}; }}
+            QProgressBar {{
+                min-height: 8px; max-height: 8px; border: none; border-radius: 4px;
+                background: #E7E1D5; color: transparent;
+            }}
+            QProgressBar::chunk {{ background: {NB_ORANGE}; border-radius: 4px; }}
+            QScrollBar:vertical {{ width: 8px; border: none; background: transparent; }}
+            QScrollBar::handle:vertical {{ min-height: 28px; border: none; border-radius: 4px; background: {NB_INK}; }}
+        """)
 
-        central = PremiumBackgroundWidget()
+        central = FlatBackgroundWidget()
         self.setCentralWidget(central)
         main_layout = QVBoxLayout(central)
         main_layout.setContentsMargins(28, 28, 28, 20)
@@ -1388,18 +1648,26 @@ class MainWindow(QMainWindow):
         # ── Header
         header = QHBoxLayout()
         header.setSpacing(8)
-        title = QLabel("Stype Dashboard")
-        title.setFont(QFont("Segoe UI", 18, QFont.Weight.ExtraBold))
+        title = QLabel("Stype")
+        title.setFont(QFont("Inter", 18, QFont.Weight.ExtraBold))
         header.addWidget(title)
         header.addStretch()
+        self.record_btn = QPushButton("Start dictation")
+        self.record_btn.setObjectName("apply_btn")
+        self.record_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.record_btn.clicked.connect(self.toggle_requested)
+        self.record_btn.setFixedHeight(36)
+        header.addWidget(self.record_btn)
         self.status_label = QLabel("Loading Model...")
         self.status_label.setObjectName("status_label")
         self.status_label.setFont(QFont("Segoe UI", 11, QFont.Weight.Bold))
-        self.status_label.setStyleSheet(f"color: {NB_YELLOW}; background: {NB_INK}; padding: 4px 10px; border: 2px solid {NB_BORDER};")
+        self.status_label.setStyleSheet(f"color: {NB_INK}; background: {NB_YELLOW}; padding: 0 12px; border: 2px solid {NB_INK}; border-radius: 6px;")
         header.addWidget(self.status_label)
+        self.status_label.setFixedHeight(36)
         quit_btn = QPushButton("⏻ Quit")
         quit_btn.setObjectName("quit_btn")
         quit_btn.setFixedWidth(86)
+        quit_btn.setFixedHeight(36)
         quit_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         quit_btn.setToolTip("Quit Stype completely")
         quit_btn.clicked.connect(QApplication.instance().quit)
@@ -1410,7 +1678,7 @@ class MainWindow(QMainWindow):
         tabs = QTabWidget()
         main_layout.addWidget(tabs, stretch=1)
 
-        # ═══ TAB 1: Engine Settings
+        # ═══ TAB 1: Home & Engine
         engine_tab = QWidget()
         el = QVBoxLayout(engine_tab)
         el.setContentsMargins(0, 20, 0, 16)
@@ -1428,12 +1696,49 @@ class MainWindow(QMainWindow):
             block.addWidget(widget)
             return block
 
-        # Model selection removed as we only use 'small.en' now
-        data_manager.set("model", "small.en")
+        intro = QLabel("Fast, private dictation that works in any Windows app")
+        intro.setObjectName("muted")
+        intro.setWordWrap(True)
+        el.addWidget(intro)
 
-        self.device_combo = BrutalComboBox()
-        self.device_combo.addItems(["CPU", "GPU (NVIDIA CUDA)"])
-        self.device_combo.setCurrentText(data_manager.get("device") or "CPU")
+        self.engine_detail_label = QLabel("Preparing the speech engine…")
+        self.engine_detail_label.setWordWrap(True)
+        self.engine_detail_label.setStyleSheet(
+            f"background: #FFF4DF; border: 2px solid {NB_INK}; border-radius: 6px; "
+            f"padding: 14px; color: {NB_MUTED}; font-size: 12px;"
+        )
+        el.addWidget(self.engine_detail_label)
+
+        self.model_progress = QProgressBar()
+        self.model_progress.setRange(0, 100)
+        self.model_progress.setValue(0)
+        self.model_progress.setTextVisible(True)
+        self.model_progress.setFormat("%p%")
+        self.model_progress.setVisible(False)
+        el.addWidget(self.model_progress)
+
+        self.model_combo = FlatComboBox()
+        self.model_combo.addItems(MODELS.keys())
+        saved_model = data_manager.get("model")
+        if saved_model in MODEL_LABELS:
+            saved_model = MODEL_LABELS[saved_model]
+        if saved_model not in MODELS:
+            saved_model = MODEL_LABELS[DEFAULT_MODEL_ID]
+        self.model_combo.setCurrentText(saved_model)
+        el.addLayout(field_block("Accuracy profile", self.model_combo))
+
+        self.language_combo = FlatComboBox()
+        self.language_combo.addItems(LANGUAGES.keys())
+        self.language_combo.setCurrentText(data_manager.get("language") or "English")
+        el.addLayout(field_block("Dictation language", self.language_combo))
+
+        self.device_combo = FlatComboBox()
+        device_choices = ["CPU"]
+        if shutil.which("nvidia-smi"):
+            device_choices.append("GPU (NVIDIA CUDA)")
+        self.device_combo.addItems(device_choices)
+        saved_device = data_manager.get("device") or "CPU"
+        self.device_combo.setCurrentText(saved_device if saved_device in device_choices else "CPU")
         el.addLayout(field_block("Processing Device", self.device_combo))
 
         startup_block = QVBoxLayout()
@@ -1451,13 +1756,13 @@ class MainWindow(QMainWindow):
 
         el.addStretch()
 
-        apply_btn = QPushButton("Apply & Reload Engine")
+        apply_btn = QPushButton("Apply engine settings")
         apply_btn.setObjectName("apply_btn")
         apply_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         apply_btn.clicked.connect(self._on_apply)
         el.addWidget(apply_btn)
 
-        tabs.addTab(engine_tab, " Engine")
+        tabs.addTab(engine_tab, "Home")
 
         # ═══ TAB 2: Audio Settings
         audio_tab = QWidget()
@@ -1466,7 +1771,7 @@ class MainWindow(QMainWindow):
         al.setSpacing(20)
 
         # Mic
-        self.mic_combo = BrutalComboBox()
+        self.mic_combo = FlatComboBox()
         self._populate_mics()
         al.addLayout(field_block("Microphone", self.mic_combo))
 
@@ -1514,7 +1819,7 @@ class MainWindow(QMainWindow):
         save_audio_btn.clicked.connect(self._on_save_audio)
         al.addWidget(save_audio_btn)
 
-        tabs.addTab(audio_tab, " Audio")
+        tabs.addTab(audio_tab, "Audio")
 
         # ═══ TAB 3: Dictionary
         dict_tab = QWidget()
@@ -1565,7 +1870,7 @@ class MainWindow(QMainWindow):
         dl.addWidget(self.dict_scroll)
         self.dict_layout.addStretch()
         
-        tabs.addTab(dict_tab, " Dictionary")
+        tabs.addTab(dict_tab, "Dictionary")
 
         # ═══ TAB 4: History
         history_tab = QWidget()
@@ -1615,11 +1920,11 @@ class MainWindow(QMainWindow):
         btn_row.addWidget(clear_btn)
         hl.addLayout(btn_row)
 
-        tabs.addTab(history_tab, " History")
+        tabs.addTab(history_tab, "History")
 
         # ── Footer hint
         hotkey_text = (data_manager.get("hotkey") or "ctrl+space").upper().replace("+", " + ")
-        action_text = "capture system sound" if data_manager.get("system_audio_enabled") else "talk"
+        action_text = "start dictation with system sound" if data_manager.get("system_audio_enabled") else "start dictation"
         hint = QLabel(f"<b>{hotkey_text}</b> to {action_text}. Close this window to run in background.")
         hint.setObjectName("muted")
         hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -1697,11 +2002,18 @@ class MainWindow(QMainWindow):
             self._engine_ref._register_hotkey(hotkey)
 
     def _on_apply(self):
-        # Model is fixed to small.en — no model_combo widget exists
-        model_id = "small.en"
+        model_label = self.model_combo.currentText()
+        model_id = MODELS.get(model_label, DEFAULT_MODEL_ID)
+        language_name = self.language_combo.currentText()
+        language_code = LANGUAGES.get(language_name)
+        model_id = compatible_model(model_id, language_code)
+        if model_id == DEFAULT_MODEL_ID and MODELS.get(model_label) != model_id:
+            model_label = MODEL_LABELS[model_id]
+            self.model_combo.setCurrentText(model_label)
         device = "cuda" if "GPU" in self.device_combo.currentText() else "cpu"
-        data_manager.set("model", "small.en")
+        data_manager.set("model", model_label)
         data_manager.set("device", self.device_combo.currentText())
+        data_manager.set("language", language_name)
 
         # Apply startup setting only on explicit save
         launch_on_startup = self.launch_startup_cb.isChecked()
@@ -1722,7 +2034,7 @@ class MainWindow(QMainWindow):
         data_manager.set("hotkey", self.current_hotkey_value.strip() or "ctrl+space")
         data_manager.set("system_audio_enabled", self.system_audio_cb.isChecked())
         hotkey_text = data_manager.get("hotkey").upper().replace("+", " + ")
-        action_text = "capture system sound" if data_manager.get("system_audio_enabled") else "talk"
+        action_text = "start dictation with system sound" if data_manager.get("system_audio_enabled") else "start dictation"
         self._hint_label.setText(f"<b>{hotkey_text}</b> to {action_text}. Close window to run in background.")
         self.settings_changed.emit()
 
@@ -1767,6 +2079,17 @@ class MainWindow(QMainWindow):
                 QTimer.singleShot(2000, lambda: self.update_status("ready"))
 
     def _on_clear_history(self):
+        if not data_manager.data.get("history"):
+            return
+        answer = QMessageBox.question(
+            self,
+            "Clear transcription history?",
+            "This removes all saved transcriptions from this computer.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
+            QMessageBox.StandardButton.Cancel,
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return
         data_manager.clear_history()
         self._rebuild_history_ui()
 
@@ -1804,8 +2127,37 @@ class MainWindow(QMainWindow):
         if not state_key in STATES: return
         state = STATES[state_key]
         self.status_label.setText(state["label"])
-        dot = state['dot']
-        self.status_label.setStyleSheet(f"color: white; background: {dot}; padding: 4px 10px; border: 2px solid {NB_BORDER};")
+        text_color = NB_INK if state_key in ("ready", "pasted", "loading", "processing") else "#FFFFFF"
+        self.status_label.setStyleSheet(
+            f"color: {text_color}; background: {state['dot']}; padding: 0 12px; "
+            f"border: 2px solid {NB_INK}; border-radius: 6px;"
+        )
+        if state_key in ("listening", "starting_mic", "starting_system"):
+            self.record_btn.setText("Stop and transcribe")
+            self.record_btn.setEnabled(True)
+        elif state_key == "processing":
+            self.record_btn.setText("Cancel processing")
+            self.record_btn.setEnabled(True)
+        elif state_key in ("loading", "downloading"):
+            self.record_btn.setText("Loading engine…")
+            self.record_btn.setEnabled(False)
+        elif state_key == "error":
+            self.record_btn.setText("Retry engine")
+            self.record_btn.setEnabled(True)
+        else:
+            self.record_btn.setText("Start dictation")
+            self.record_btn.setEnabled(True)
+        if state_key in ("ready", "error"):
+            self.model_progress.setVisible(False)
+
+    def update_engine_detail(self, detail):
+        self.engine_detail_label.setText(detail)
+
+    def update_model_download(self, percent, detail):
+        self.model_progress.setVisible(True)
+        self.model_progress.setValue(max(0, min(100, percent)))
+        self.model_progress.setFormat(f"{percent}%")
+        self.engine_detail_label.setText(detail)
 
     def closeEvent(self, event):
         """Override close to just hide the window, keeping it out of the taskbar."""
@@ -1822,6 +2174,7 @@ class StypeEngine(QObject):
         self.signals = Signals()
         self.model = None
         self.recording = False
+        self._starting_audio = False
         self.processing = False
         self._toggle_lock = threading.Lock()
         self.cancelled = False
@@ -1834,6 +2187,14 @@ class StypeEngine(QObject):
         self._current_process_id = 0
         self._current_hotkey = None
         self._current_hotkey_text = None
+        self._model_load_id = 0
+        self._model_id = None
+        self._model_device = "cpu"
+        self._model_process = None
+        self._model_listener = None
+        self._model_connection = None
+        self._worker_reported_exit = False
+        self._target_window = None
 
         self.pill = PillOverlay()
         self.pill.set_system_audio_enabled(data_manager.get("system_audio_enabled"))
@@ -1842,26 +2203,40 @@ class StypeEngine(QObject):
 
         self.dashboard.model_changed.connect(self._reload_model)
         self.dashboard.settings_changed.connect(self._on_settings_changed)
+        self.dashboard.toggle_requested.connect(self._toggle)
         self.signals.state_changed.connect(self.pill.set_state)
         self.signals.state_changed.connect(self.dashboard.update_status)
         self.signals.state_changed.connect(self._update_tray_tooltip)
         self.signals.transcription_done.connect(self._on_transcription)
         self.signals.ready_reset.connect(self._on_ready_reset)
+        self.signals.toggle_requested.connect(self._toggle)
+        self.signals.audio_level_changed.connect(self.pill.set_audio_level)
+        self.signals.engine_detail_changed.connect(self.dashboard.update_engine_detail)
+        self.signals.model_download_progress.connect(self.dashboard.update_model_download)
+        self.signals.model_download_progress.connect(self.pill.set_download_progress)
+        self.signals.audio_error.connect(self._on_audio_error)
+        self.signals.capture_source_changed.connect(self.pill.set_capture_source)
         
         self.pill.clicked_toggle.connect(self._toggle)
         self.pill.clicked_cancel.connect(self._cancel)
         self.pill.clicked_dashboard.connect(self.dashboard.show)
         self.pill.clicked_system_audio.connect(self._toggle_system_audio)
+        self.pill.clicked_quit.connect(self._quit_app)
 
 
         self._pasted_timer = QTimer()
         self._pasted_timer.setSingleShot(True)
         self._pasted_timer.timeout.connect(lambda: self._emit_state("ready"))
 
-        # Safety timeout: if processing hangs for >15s, force-cancel
+        # Safety timeout for a genuinely stalled worker.
         self._processing_timeout = QTimer()
         self._processing_timeout.setSingleShot(True)
         self._processing_timeout.timeout.connect(self._on_processing_timeout)
+
+        self._model_poll_timer = QTimer(self)
+        self._model_poll_timer.setInterval(100)
+        self._model_poll_timer.timeout.connect(self._poll_model_worker)
+        self._model_poll_timer.start()
 
         # Stream is created on demand
         
@@ -1870,7 +2245,8 @@ class StypeEngine(QObject):
 
         # Tray icon
         qapp = QApplication.instance()
-        icon_path = os.path.join(APP_DIR, "assets", "icon.ico")
+        qapp.aboutToQuit.connect(self._stop_model_worker)
+        icon_path = os.path.join(RESOURCE_DIR, "assets", "icon.ico")
         icon_path = icon_path if os.path.exists(icon_path) else ""
         self.tray_icon = QSystemTrayIcon(QIcon(icon_path), qapp)
 
@@ -1894,14 +2270,18 @@ class StypeEngine(QObject):
         self.tray_icon.show()
 
         self.pill.show()
-        # self.dashboard.show() # Hide dashboard on launch as requested
+        self.dashboard.show()
+        self.dashboard.raise_()
+        self.dashboard.activateWindow()
 
         # Load saved model/device
         saved_model = data_manager.get("model")
-        model_id = MODELS.get(saved_model, "small.en")
+        model_id = saved_model if saved_model in MODEL_LABELS else MODELS.get(saved_model, DEFAULT_MODEL_ID)
+        language_code = LANGUAGES.get(data_manager.get("language") or "English", "en")
+        model_id = compatible_model(model_id, language_code)
         saved_device = data_manager.get("device")
         device = "cuda" if "GPU" in saved_device else "cpu"
-        threading.Thread(target=self._load_model, args=(model_id, device), daemon=True).start()
+        self._start_model_load(model_id, device)
 
     def _quit_app(self):
         """Forcefully clean up everything and quit."""
@@ -1929,11 +2309,13 @@ class StypeEngine(QObject):
         tooltips = {
             "ready": "Stype — Ready",
             "loading": "Stype — Loading Model...",
+            "downloading": "Stype — Downloading Model...",
             "listening": "Stype — Recording...",
             "starting_mic": "Stype — Opening Mic...",
             "starting_system": "Stype — Opening System Sound...",
             "processing": "Stype — Processing...",
             "pasted": "Stype — Ready",
+            "error": "Stype — Needs attention",
         }
         self.tray_icon.setToolTip(tooltips.get(state_key, "Stype"))
 
@@ -1953,12 +2335,13 @@ class StypeEngine(QObject):
     def _start_mic_stream(self):
         if hasattr(self, 'stream') and self.stream:
             return
-        self._audio_sample_rate = 16000
         try:
             mic_name = data_manager.get("mic_device")
             device_idx = find_input_device_index(mic_name)
+            device_info = sd.query_devices(device_idx, "input")
+            self._audio_sample_rate = int(round(float(device_info.get("default_samplerate", 16000))))
             self.stream = sd.InputStream(
-                samplerate=16000,
+                samplerate=self._audio_sample_rate,
                 channels=1,
                 dtype="float32",
                 device=device_idx,
@@ -1974,14 +2357,29 @@ class StypeEngine(QObject):
         if hasattr(self, 'system_stream') and self.system_stream:
             return
         try:
-            self.system_stream = SystemAudioStream(self._sys_callback, samplerate=16000)
-            self.system_stream.start()
+            self._audio_sample_rate = 48000
+            self.system_stream = SystemAudioStream(
+                self._sys_callback,
+                samplerate=self._audio_sample_rate,
+                error_callback=self.signals.audio_error.emit,
+            )
             self._system_stream_active = True
-            self.pill.set_capture_source("system_active")
+            self.system_stream.start()
+            self.signals.capture_source_changed.emit("system_active")
         except Exception as e:
             self.system_stream = None
             self._system_stream_active = False
             logger.error(f"Failed to start system stream: {e}")
+
+    def _on_audio_error(self, message):
+        self.recording = False
+        self._starting_audio = False
+        self._system_stream_active = False
+        self.system_stream = None
+        self.audio_frames_mic = []
+        self.audio_frames_sys = []
+        self.signals.engine_detail_changed.emit(f"Audio capture failed: {message}")
+        self._emit_state("error")
 
 
     def _stop_system_stream(self):
@@ -1995,7 +2393,7 @@ class StypeEngine(QObject):
             except Exception: pass
             self.system_stream = None
         self._system_stream_active = False
-        self.pill.set_capture_source("microphone")
+        self.signals.capture_source_changed.emit("microphone")
 
     def _stop_mic_stream(self):
         if hasattr(self, 'stream') and self.stream:
@@ -2014,7 +2412,7 @@ class StypeEngine(QObject):
         """Register the global hotkey from settings.
         
         IMPORTANT: The keyboard library fires its callback on a background thread.
-        We must marshal the call to the Qt main thread using QTimer.singleShot.
+        We marshal it to the Qt main thread with a queued signal.
         """
         if self._current_hotkey:
             try:
@@ -2025,9 +2423,9 @@ class StypeEngine(QObject):
 
         hotkey = hotkey or data_manager.get("hotkey") or "ctrl+space"
 
-        # Wrap toggle in a Qt-main-thread-safe callback
+        # This worker thread has no Qt event loop, so QTimer.singleShot is unsafe here.
         def _hotkey_callback():
-            QTimer.singleShot(0, self._toggle)
+            self.signals.toggle_requested.emit()
 
         try:
             self._current_hotkey = keyboard.add_hotkey(hotkey, _hotkey_callback, suppress=False)
@@ -2073,7 +2471,7 @@ class StypeEngine(QObject):
         process_id = self._current_process_id
         self._emit_state("processing")
         self.tray_icon.setToolTip("Stype — Processing...")
-        self._processing_timeout.start(15000)  # 15 second safety net
+        self._processing_timeout.start(180000)  # large CPU models can legitimately need >15s
         threading.Thread(target=self._process, args=(process_id,), daemon=True).start()
 
     def _finish_recording(self, process_if_speech=True):
@@ -2081,6 +2479,7 @@ class StypeEngine(QObject):
             return
 
         self.recording = False
+        self._starting_audio = False
         self._stop_mic_stream()
         self._stop_system_stream()
 
@@ -2104,7 +2503,7 @@ class StypeEngine(QObject):
             # Audio level for pill VU meter
             rms = np.sqrt(np.mean(chunk ** 2))
             level = min(1.0, (rms / 0.03) ** 0.5)  # boost lower volumes
-            self.pill.set_audio_level(level)
+            self.signals.audio_level_changed.emit(float(level))
 
     def _sys_callback(self, indata, frames, time_info, status):
         if self.recording and self._system_stream_active:
@@ -2121,6 +2520,7 @@ class StypeEngine(QObject):
         self.cancelled = True
         self._current_process_id += 1
         self.recording = False
+        self._starting_audio = False
         self.processing = False
         self.audio_frames_mic = []
         self.audio_frames_sys = []
@@ -2153,84 +2553,275 @@ class StypeEngine(QObject):
                 self._cancel()
                 return
 
+            if self._starting_audio:
+                self._starting_audio = False
+                self._stop_mic_stream()
+                self._stop_system_stream()
+                self._emit_state("ready")
+                return
+
             if self.model is None:
-                logger.warning("Toggle ignored: Model not loaded yet.")
+                if self._model_process is None or self._model_process.poll() is not None:
+                    self.signals.engine_detail_changed.emit("Retrying the speech engine…")
+                    self._start_model_load(self._model_id or DEFAULT_MODEL_ID, self._model_device)
+                else:
+                    self.signals.engine_detail_changed.emit("The speech engine is still preparing. Please wait for Ready.")
                 return
 
             if not self.recording:
-                self.pill.set_capture_source("microphone")
-                self._emit_state("starting_mic")
+                if os.name == "nt":
+                    try:
+                        import win32gui
+                        self._target_window = win32gui.GetForegroundWindow()
+                    except Exception:
+                        self._target_window = None
+                use_system_audio = bool(data_manager.get("system_audio_enabled"))
+                self.signals.capture_source_changed.emit("system_active" if use_system_audio else "microphone")
+                self._emit_state("starting_system" if use_system_audio else "starting_mic")
                 self._reset_recording_state()
+                self._starting_audio = True
                 threading.Thread(target=self._init_audio_and_record, daemon=True).start()
             else:
                 self._finish_recording(process_if_speech=True)
 
 
     def _init_audio_and_record(self):
-        self._start_mic_stream()
-        if hasattr(self, 'stream') and self.stream is not None:
-            self.recording = True
-            self._emit_state("listening")
+        use_system_audio = bool(data_manager.get("system_audio_enabled"))
+        if use_system_audio:
+            self._start_system_stream()
+            opened = self._system_stream_active
         else:
-            self._emit_state("ready")
+            self._start_mic_stream()
+            opened = hasattr(self, 'stream') and self.stream is not None
+        if opened and self._starting_audio:
+            self.recording = True
+            self._starting_audio = False
+            self._emit_state("listening")
+        elif opened:
+            self._stop_mic_stream()
+            self._stop_system_stream()
+        else:
+            self._starting_audio = False
+            self.signals.engine_detail_changed.emit(
+                "Audio input could not be opened. Check the selected source on the Audio tab, then try again."
+            )
+            self._emit_state("error")
 
-    def _load_model(self, model_id, device):
-        """Load Whisper model. Always uses the bundled model folder directly.
-        
-        When packaged with PyInstaller, we pass the absolute path to the
-        bundled model directory to avoid HuggingFace Hub trying to download
-        anything at runtime.
-        """
+    def _resolve_model_path(self, model_id):
+        return resolve_model_path(model_id)
+
+    def _start_model_load(self, model_id, device):
+        self._model_load_id += 1
+        self._stop_model_worker()
+        self.model = None
+        self._model_id = model_id
+        self._model_device = device
+        self._worker_reported_exit = False
         self._emit_state("loading")
+        label = MODEL_LABELS.get(model_id, model_id)
+        model_path = self._resolve_model_path(model_id)
+        if model_path:
+            self.signals.engine_detail_changed.emit(f"Loading {label} on {device.upper()}…")
+            logger.info(f"Starting model worker with bundled model: {model_path}")
+        else:
+            approximate_size = "1.6 GB" if model_id == "large-v3-turbo" else "480 MB"
+            self.signals.engine_detail_changed.emit(
+                f"First-time setup: downloading {label} ({approximate_size}) from Hugging Face. "
+                "Keep Stype open; it is saved once for future launches."
+            )
+            logger.info(f"Model '{model_id}' is not cached; the worker will download it.")
+
+        authkey = os.urandom(24)
+        self._model_listener = Listener(("127.0.0.1", 0), authkey=authkey)
+        port = self._model_listener.address[1]
+        worker_args = [
+            str(port),
+            authkey.hex(),
+            model_path or "",
+            model_id,
+            device,
+            str(min(8, os.cpu_count() or 4)),
+            os.path.join(USER_DATA_DIR, "models"),
+        ]
+        if getattr(sys, "frozen", False):
+            command = [os.path.join(APP_DIR, "StypeEngine.exe")]
+        else:
+            command = [sys.executable, os.path.join(APP_DIR, "stype_worker.py")]
+        command.extend(worker_args)
+        startupinfo = None
+        creationflags = 0
+        if os.name == "nt":
+            startupinfo = subprocess.STARTUPINFO()
+            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            creationflags = subprocess.CREATE_NO_WINDOW
+        self._model_process = subprocess.Popen(
+            command,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            startupinfo=startupinfo,
+            creationflags=creationflags,
+        )
+        threading.Thread(target=self._accept_model_worker, daemon=True).start()
+
+    def _accept_model_worker(self):
+        listener = self._model_listener
+        if listener is None:
+            return
         try:
-            compute_type = "float16" if device == "cuda" else "int8"
-
-            # Build the path to the bundled model folder
-            whisper_base = os.path.join(APP_DIR, "whisper_model")
-            # faster-whisper expects the model folder in HuggingFace cache layout:
-            # whisper_model/models--Systran--faster-whisper-small.en/snapshots/<hash>/
-            # Try to find the snapshot folder so we can load directly from it
-            bundled_model_path = None
-            hub_folder = os.path.join(whisper_base, "models--Systran--faster-whisper-small.en")
-            snapshots_dir = os.path.join(hub_folder, "snapshots")
-            if os.path.isdir(snapshots_dir):
-                snapshots = [d for d in os.listdir(snapshots_dir)
-                             if os.path.isdir(os.path.join(snapshots_dir, d))]
-                if snapshots:
-                    bundled_model_path = os.path.join(snapshots_dir, snapshots[0])
-                    logger.info(f"Using bundled model at: {bundled_model_path}")
-
-            if bundled_model_path and os.path.isdir(bundled_model_path):
-                # Load directly from the snapshot folder (no download needed)
-                self.model = WhisperModel(
-                    bundled_model_path,
-                    device=device,
-                    compute_type=compute_type,
-                    cpu_threads=os.cpu_count() or 4,
-                    num_workers=1,
-                )
+            connection = listener.accept()
+            if listener is self._model_listener:
+                self._model_connection = connection
             else:
-                # Fallback: load by name, allowing HF Hub to manage caching
-                logger.warning(f"Bundled model not found at {whisper_base}, falling back to HF Hub download.")
-                self.model = WhisperModel(
-                    model_id,
-                    device=device,
-                    compute_type=compute_type,
-                    cpu_threads=os.cpu_count() or 4,
-                    num_workers=1,
-                    download_root=whisper_base
-                )
+                connection.close()
+        except Exception as exc:
+            logger.warning(f"Model worker connection failed: {exc}")
+        finally:
+            try:
+                listener.close()
+            except Exception:
+                pass
 
-            logger.info("Whisper model loaded successfully.")
+    def _stop_model_worker(self):
+        process = self._model_process
+        if process is None:
+            return
+        try:
+            if process.poll() is None and self._model_connection is not None:
+                self._model_connection.send(("stop",))
+                process.wait(timeout=2.0)
+            if process.poll() is None:
+                process.terminate()
+                process.wait(timeout=1.0)
+        except Exception as exc:
+            logger.warning(f"Could not stop model worker cleanly: {exc}")
+        finally:
+            try:
+                if self._model_connection is not None:
+                    self._model_connection.close()
+                if self._model_listener is not None:
+                    self._model_listener.close()
+            except Exception:
+                pass
+            self._model_process = None
+            self._model_connection = None
+            self._model_listener = None
+
+    def _poll_model_worker(self):
+        connection = self._model_connection
+        if connection is not None:
+            try:
+                while connection.poll():
+                    self._handle_model_message(connection.recv())
+            except (EOFError, OSError) as exc:
+                logger.warning(f"Model worker disconnected: {exc}")
+                try:
+                    connection.close()
+                except Exception:
+                    pass
+                if connection is self._model_connection:
+                    self._model_connection = None
+
+        process = self._model_process
+        if process is not None and process.poll() is not None and not self._worker_reported_exit:
+            self._worker_reported_exit = True
+            was_ready = self.model is True
+            self.model = None
+            self._model_connection = None
+            self.signals.engine_detail_changed.emit(
+                "The speech engine stopped unexpectedly. Press Retry engine to restart it."
+                if was_ready else
+                "The speech engine stopped during startup. Try the Fast profile or press Retry engine."
+            )
+            self._emit_state("error")
+
+    def _handle_model_message(self, message):
+        kind = message[0]
+        if kind == "download_progress":
+            _, model_id, percent, downloaded, total = message
+            if model_id != self._model_id:
+                return
+            downloaded_gb = downloaded / (1024 ** 3)
+            total_gb = total / (1024 ** 3)
+            self.signals.model_download_progress.emit(
+                percent,
+                f"Downloading {MODEL_LABELS.get(model_id, model_id)} — {percent}% "
+                f"({downloaded_gb:.2f} / {total_gb:.2f} GB)",
+            )
+            self._emit_state("downloading")
+        elif kind == "download_retry":
+            _, model_id, attempt, _error = message
+            if model_id != self._model_id:
+                return
+            self.signals.engine_detail_changed.emit(
+                f"Download interrupted. Retrying automatically ({attempt}/3)…"
+            )
+            self._emit_state("downloading")
+        elif kind == "model_loading":
+            _, model_id = message
+            if model_id != self._model_id:
+                return
+            self.signals.model_download_progress.emit(100, "Download complete. Initializing the speech engine…")
+            self._emit_state("loading")
+        elif kind == "model_ready":
+            _, model_id, _ = message
+            if model_id != self._model_id:
+                return
+            self.model = True
+            label = MODEL_LABELS.get(model_id, model_id)
+            logger.info(f"Whisper model worker ready: {model_id}")
+            self.signals.engine_detail_changed.emit(
+                f"{label} is ready on {self._model_device.upper()}. Press the hotkey or Start dictation."
+            )
             self._emit_state("ready")
-        except Exception as e:
-            logger.error(f"Model load error: {e}", exc_info=True)
-            self._emit_state("ready")
+        elif kind == "device_fallback":
+            _, model_id, fallback_device = message
+            if model_id != self._model_id:
+                return
+            self._model_device = fallback_device
+            self.signals.engine_detail_changed.emit(
+                "GPU initialization failed; continuing automatically on CPU…"
+            )
+            self._emit_state("loading")
+        elif kind == "model_error":
+            _, model_id, error = message
+            if model_id != self._model_id:
+                return
+            logger.error(f"Model worker error: {error}")
+            self.model = None
+            self.signals.engine_detail_changed.emit(user_facing_engine_error(error))
+            self._emit_state("error")
+        elif kind == "transcription":
+            _, process_id, raw_text, prompt, language_code = message
+            self._processing_timeout.stop()
+            if self.cancelled or process_id != self._current_process_id:
+                return
+            if prompt and raw_text and len(raw_text.split()) <= 5:
+                clean_raw = re.sub(r'[^\w\s]', '', raw_text.lower()).strip()
+                clean_prompt = re.sub(r'[^\w\s]', '', prompt.lower()).strip()
+                if clean_raw and clean_raw in clean_prompt:
+                    raw_text = ""
+            if raw_text:
+                processed_text = post_process(raw_text, language_code)
+                if processed_text:
+                    self.signals.transcription_done.emit(processed_text, process_id)
+                else:
+                    self.signals.ready_reset.emit()
+            else:
+                self.signals.ready_reset.emit()
+        elif kind == "transcription_error":
+            _, process_id, error = message
+            logger.error(f"Transcription error: {error}")
+            if process_id == self._current_process_id:
+                self.signals.engine_detail_changed.emit(f"Transcription failed: {error}")
+                self.signals.ready_reset.emit()
 
 
     def _reload_model(self, model_id, device):
+        if self.recording or self.processing:
+            self._cancel()
         self.model = None
-        threading.Thread(target=self._load_model, args=(model_id, device), daemon=True).start()
+        self._start_model_load(model_id, device)
 
     def _process(self, process_id):
         if process_id != self._current_process_id:
@@ -2261,6 +2852,7 @@ class StypeEngine(QObject):
         mixed_audio = np.zeros(max_len, dtype=np.float32)
         if len(audio_data_mic) > 0: mixed_audio[:len(audio_data_mic)] += audio_data_mic
         if len(audio_data_sys) > 0: mixed_audio[:len(audio_data_sys)] += audio_data_sys
+        mixed_audio = np.clip(mixed_audio, -1.0, 1.0)
 
         # Prevent VAD filter crash/hang on micro-recordings or pure silence
         if len(mixed_audio) < sample_rate * 0.3:
@@ -2270,11 +2862,10 @@ class StypeEngine(QObject):
             return
 
 
-        # Check if audio is near-silence (RMS < threshold)
-        # 0.003 is a very conservative floor — real speech always exceeds this
+        # Only discard digital silence; Silero VAD handles quiet real speech.
         rms = np.sqrt(np.mean(mixed_audio ** 2))
         logger.info(f"Audio RMS level: {rms:.5f}")
-        if rms < 0.003:
+        if rms < 0.0001:
             logger.info(f"Audio too silent (RMS: {rms:.5f}), skipping processing.")
             if process_id == self._current_process_id:
                 self.signals.ready_reset.emit()
@@ -2282,55 +2873,17 @@ class StypeEngine(QObject):
 
 
         try:
-            vocab = []
-            for entry in data_manager.data.get("personal_dict", []):
-                target = entry.get("target", "").strip()
-                replacement = entry.get("replacement", "").strip()
-                if target:
-                    if not replacement or target.lower() == replacement.lower():
-                        vocab.append(target)
-                    elif replacement:
-                        vocab.append(replacement)
+            vocab = dictionary_hotwords(data_manager.data.get("personal_dict", []))
             
-            prompt = FORMATTING_PROMPT
-            if vocab:
-                prompt += " Vocabulary: " + ", ".join(list(set(vocab))[:50])
+            language_name = data_manager.get("language") or "English"
+            language_code = LANGUAGES.get(language_name, "en")
+            prompt = ""
 
-            # NOTE: vad_filter=True is intentionally DISABLED.
-            # In a packaged app, faster_whisper's VAD downloads the silero-vad model
-            # from the internet at runtime. This model is NOT bundled, causing the
-            # transcription to silently fail. We do our own silence check above (RMS).
-            transcribe_kwargs = dict(
-                beam_size=5,
-                vad_filter=False,
-                condition_on_previous_text=False,
-                initial_prompt=prompt,
-                language="en"
-            )
+            transcribe_kwargs = build_transcription_options(language_code, vocab)
 
-            segments, _ = self.model.transcribe(mixed_audio, **transcribe_kwargs)
-            
-            # Check if user cancelled while we were working
-            if self.cancelled or process_id != self._current_process_id:
-                return
-
-            raw_text = "".join([s.text for s in segments]).strip()
-
-            # Anti-hallucination: only filter if output is VERY short and matches prompt exactly
-            if prompt and raw_text and len(raw_text.split()) <= 5:
-                clean_raw = re.sub(r'[^\w\s]', '', raw_text.lower()).strip()
-                clean_prompt = re.sub(r'[^\w\s]', '', prompt.lower()).strip()
-                if clean_raw and clean_raw in clean_prompt:
-                    raw_text = ""
-
-            if self.cancelled or process_id != self._current_process_id:
-                return
-
-            if raw_text:
-                final_text = post_process(raw_text)
-                self.signals.transcription_done.emit(final_text, process_id)
-            elif process_id == self._current_process_id:
-                self.signals.ready_reset.emit()
+            if self._model_connection is None or self._model_process is None or self._model_process.poll() is not None:
+                raise RuntimeError("speech engine process is not running")
+            self._model_connection.send(("transcribe", process_id, mixed_audio, transcribe_kwargs, prompt))
 
         except Exception as e:
             logger.error(f"Transcription error: {e}")
@@ -2349,44 +2902,46 @@ class StypeEngine(QObject):
         latest_entry = data_manager.data["history"][0]
         item = HistoryItem(latest_entry)
         self.dashboard.history_layout.insertWidget(0, item)
+        while self.dashboard.history_layout.count() > 101:  # 100 records plus trailing stretch
+            stale = self.dashboard.history_layout.takeAt(100)
+            if stale.widget():
+                stale.widget().deleteLater()
 
         # ── Paste text ──────────────────────────────────────────────
-        # Step 1: Copy text to clipboard (with win32 fallback for packaged apps)
-        clipboard_ok = False
-        try:
-            pyperclip.copy(text)
-            clipboard_ok = True
-        except Exception as clip_err:
-            logger.warning(f"pyperclip failed: {clip_err}, trying win32clipboard...")
-            try:
-                import win32clipboard
-                win32clipboard.OpenClipboard()
-                win32clipboard.EmptyClipboard()
-                win32clipboard.SetClipboardText(text, win32clipboard.CF_UNICODETEXT)
-                win32clipboard.CloseClipboard()
-                clipboard_ok = True
-                logger.info("win32clipboard copy succeeded.")
-            except Exception as w32_err:
-                logger.error(f"win32clipboard also failed: {w32_err}")
+        clipboard = QApplication.clipboard()
+        old_mime = clipboard.mimeData()
+        saved_formats = {fmt: bytes(old_mime.data(fmt)) for fmt in old_mime.formats()}
+        clipboard.setText(text)
 
-        if clipboard_ok:
-            # Step 2: Release any held modifier keys so Ctrl+V isn't swallowed
-            hotkey = self._current_hotkey_text or data_manager.get("hotkey") or "ctrl+space"
-            for key in hotkey.split("+"):
-                try:
-                    keyboard.release(key.strip())
-                except Exception:
-                    pass
-
-            # Step 3: Wait for target window to regain focus, then paste
-            time.sleep(0.15)  # 150ms — much more reliable than 50ms
+        hotkey = self._current_hotkey_text or data_manager.get("hotkey") or "ctrl+space"
+        for key in hotkey.split("+"):
             try:
-                keyboard.send('ctrl+v')
+                keyboard.release(key.strip())
+            except Exception:
+                pass
+
+        def paste_and_restore():
+            try:
+                if os.name == "nt" and self._target_window:
+                    import win32gui
+                    if win32gui.IsWindow(self._target_window):
+                        win32gui.SetForegroundWindow(self._target_window)
+                keyboard.send("ctrl+v")
                 logger.info(f"Pasted {len(text)} chars.")
             except Exception as paste_err:
                 logger.error(f"keyboard.send ctrl+v failed: {paste_err}")
-        else:
-            logger.error("Could not copy to clipboard — paste skipped.")
+
+            def restore_clipboard():
+                if clipboard.text() != text:
+                    return  # The user copied something new; never overwrite it.
+                restored = QMimeData()
+                for fmt, payload in saved_formats.items():
+                    restored.setData(fmt, QByteArray(payload))
+                clipboard.setMimeData(restored)
+
+            QTimer.singleShot(350, restore_clipboard)
+
+        QTimer.singleShot(120, paste_and_restore)
 
         self._emit_state("pasted")
         self.tray_icon.setToolTip("Stype — Ready")
@@ -2399,18 +2954,21 @@ if __name__ == "__main__":
     _mutex_handle = None
     if os.name == "nt":
         import ctypes
-        _mutex_handle = ctypes.windll.kernel32.CreateMutexW(None, True, "Global\\StypeVoiceDictation_SingleInstance_v2")
+        _mutex_handle = ctypes.windll.kernel32.CreateMutexW(None, True, "Local\\StypeVoiceDictation_SingleInstance_v2")
         if ctypes.windll.kernel32.GetLastError() == 183:  # ERROR_ALREADY_EXISTS
             logger.info("Another instance is already running. Exiting.")
             ctypes.windll.kernel32.CloseHandle(_mutex_handle)
             sys.exit(0)
 
 
+    logger.info("Creating QApplication")
     app = QApplication(sys.argv)
     app.setQuitOnLastWindowClosed(False)
     
     try:
+        logger.info("Creating Stype engine and UI")
         engine = StypeEngine()
+        logger.info("Entering Qt event loop")
         exit_code = app.exec()
     except Exception as e:
         logger.critical(f"Unhandled exception in main loop: {e}", exc_info=True)

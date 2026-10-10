@@ -1,11 +1,14 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+from PyInstaller.utils.hooks import collect_data_files
+
+faster_whisper_data = collect_data_files('faster_whisper')
+
 a = Analysis(
     ['stype.py'],
     pathex=[],
     binaries=[],
     datas=[
-        ('whisper_model/models--Systran--faster-whisper-small.en', 'whisper_model/models--Systran--faster-whisper-small.en'),
         ('assets', 'assets'),
     ],
     hiddenimports=[
@@ -24,10 +27,6 @@ a = Analysis(
         # Windows clipboard fallback
         'win32clipboard',
         'win32con',
-        # faster-whisper internals
-        'huggingface_hub',
-        'tokenizers',
-        'faster_whisper',
         # PyQt6 internals
         'PyQt6.sip',
     ],
@@ -39,7 +38,40 @@ a = Analysis(
     noarchive=False,
     optimize=0,
 )
+
+# The Codex workspace runtime adds Poppler/libheif folders to PATH. PyInstaller
+# must not collect those unrelated DLLs (notably icuuc.dll), which collide with
+# Qt at startup in the frozen app.
+a.binaries = [
+    entry for entry in a.binaries
+    if '\\.cache\\codex-runtimes\\' not in entry[1].lower()
+]
+
+worker = Analysis(
+    ['stype_worker.py'],
+    pathex=[],
+    binaries=[],
+    datas=faster_whisper_data,
+    hiddenimports=[
+        'faster_whisper',
+        'huggingface_hub',
+        'tokenizers',
+        'onnxruntime',
+        'numpy',
+    ],
+    hookspath=[],
+    hooksconfig={},
+    runtime_hooks=[],
+    excludes=['PyQt6', 'tensorflow', 'torch', 'scipy', 'pandas', 'matplotlib', 'tkinter', 'unittest', 'pytest'],
+    noarchive=False,
+    optimize=0,
+)
+worker.binaries = [
+    entry for entry in worker.binaries
+    if '\\.cache\\codex-runtimes\\' not in entry[1].lower()
+]
 pyz = PYZ(a.pure)
+worker_pyz = PYZ(worker.pure)
 
 exe = EXE(
     pyz,
@@ -58,12 +90,34 @@ exe = EXE(
     codesign_identity=None,
     entitlements_file=None,
     icon=['assets/icon.ico'],
-    contents_directory='.',
+    contents_directory='_internal',
+)
+worker_exe = EXE(
+    worker_pyz,
+    worker.scripts,
+    [],
+    exclude_binaries=True,
+    name='StypeEngine',
+    debug=False,
+    bootloader_ignore_signals=False,
+    strip=False,
+    upx=False,
+    console=False,
+    disable_windowed_traceback=False,
+    argv_emulation=False,
+    target_arch=None,
+    codesign_identity=None,
+    entitlements_file=None,
+    icon=['assets/icon.ico'],
+    contents_directory='_internal',
 )
 coll = COLLECT(
     exe,
+    worker_exe,
     a.binaries,
     a.datas,
+    worker.binaries,
+    worker.datas,
     strip=False,
     upx=False,          # UPX disabled here too
     upx_exclude=[],

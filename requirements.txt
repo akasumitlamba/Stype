@@ -5,3 +5,4 @@ soundcard
 keyboard
 pyperclip
 faster-whisper
+pywin32; platform_system == "Windows"

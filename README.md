@@ -4,29 +4,32 @@ Website Link : https://akasumitlamba.github.io/Stype/
 
 **AI-Powered Speech-to-Text for Windows** _The speed of thought, typed at the speed of sound._
 
-Stype is a lightweight, offline-first Windows desktop application that uses OpenAI's **Whisper** (via `faster-whisper`) to convert your speech into text instantly. It features a premium, modern dashboard and a minimalist floating pill overlay that works across all Windows applications.
+Stype is an offline-first Windows desktop application that uses OpenAI's **Whisper** (via `faster-whisper`) to convert speech into text. Its desktop UI shares the website's warm cream, navy, orange, purple, and yellow visual system, with a compact pill that stays out of the way.
 
 ---
 
 ## ✨ Features
 
-- **Offline AI Engine:** Powered by `faster-whisper` for high accuracy without sending your data to the cloud.
-- **Premium Dashboard:** A modern UI with mesh gradients and a glassmorphism design for managing settings and history.
+- **Offline AI Engine:** Powered by `faster-whisper`; audio stays local and is never uploaded for transcription.
+- **Native-Language Dictation:** Selected languages are transcribed in their original script; Stype never requests translation.
+- **Practical Dashboard:** Website-matched typography, outlined controls, consistent sizing, clear engine status, one-click dictation, settings, and history.
 - **Dynamic Pill UI:** A sleek, minimalist floating overlay that shows real-time status (Recording, Processing, Pasted).
 - **System Sound Input:** Switch audio capture to Windows playback and use the pill's speaker control to transcribe what is playing locally.
 - **Interactive History:** Every transcription is saved in a history list where you can easily copy previous entries with a single click.
-- **Smart Replacements:** A built-in context algorithm that automatically fixes common homophone errors (e.g., "out words" -> "outwards").
+- **Explicit Replacements:** Personal dictionary replacements apply deterministically, while vocabulary items only help recognition.
 - **Global Hotkey:** A simple `Ctrl + Space` toggle that works across browser, code editor, or Word docs.
-- **Privacy First:** No internet connection required. Your voice stays on your machine.
+- **Privacy First:** The selected open-source model is downloaded once on first launch, then transcription works offline and your voice stays on your machine.
 
 ---
 
 ## 🚀 Installation (Releases)
 
 1. Head over to the [Releases](https://github.com/akasumitlamba/stype/releases) page.
-2. Download the latest `Stype_Setup_vX.X.X.exe`.
+2. Download the latest `Stype_Setup.exe`.
 3. Run the installer.
-4. Launch Stype from your Desktop or Start Menu.
+4. Launch Stype from your Desktop or Start Menu. First launch shows model download percentage and stores the model in `%APPDATA%\Stype\models`; future launches reuse that cache.
+
+Uninstalling Stype removes its downloaded models and the rest of `%APPDATA%\Stype`, including settings, history, and logs, so the speech model does not continue using disk space.
 
 ---
 

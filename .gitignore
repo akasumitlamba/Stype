@@ -6,8 +6,10 @@ __pycache__/
 .Python
 env/
 build/
+build_*/
 develop-eggs/
 dist/
+dist_*/
 downloads/
 eggs/
 .eggs/
@@ -37,6 +39,7 @@ stype_data.json
 
 # Installer output — never commit the built setup exe
 installer_output/
+installer_smoke_*/
 
 # Log files
 *.log
